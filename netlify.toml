@@ -1,0 +1,20 @@
+[build]
+  base = "frontend"
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Proxy API calls to deployed backend service (Render / Railway / custom host)
+[[redirects]]
+  from = "/api/*"
+  to = "https://cyberguard-backend.onrender.com/api/:splat"
+  status = 200
+  force = false
+
+# Single-page application route rewrite
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
