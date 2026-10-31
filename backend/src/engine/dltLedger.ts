@@ -199,7 +199,7 @@ export function addLedgerBlock(
     ? previousBlock.blockHash
     : '0000000000000000000000000000000000000000000000000000000000000000';
 
-  const validators = initialValidators || [reporterOrg, 'City Hospital', 'State University'];
+  const validators = initialValidators || [reporterOrg, 'Hospital B', 'University C'];
   const status = initialStatus || (validators.length >= 3 ? 'CONFIRMED' : getValidatorStatus(validators.length));
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
