@@ -4,15 +4,17 @@
   "description": "CyberGuard Grid - Cyber Threat Intelligence & Incident Response Platform",
   "workspaces": [
     "backend",
-    "frontend"
+    "frontend",
+    "agent"
   ],
   "scripts": {
     "start": "node run.js",
     "dev": "node run.js",
     "backend": "npm --prefix backend run dev",
     "frontend": "npm --prefix frontend run dev",
-    "build": "npm --prefix backend run build && npm --prefix frontend run build",
-    "install:all": "npm install --prefix backend && npm install --prefix frontend"
+    "agent": "npm --prefix agent run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build && npm --prefix agent run build",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend && npm install --prefix agent"
   },
   "keywords": ["cybersecurity", "threat-intelligence", "incident-response"],
   "author": "",

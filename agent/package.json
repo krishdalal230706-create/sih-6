@@ -1,0 +1,32 @@
+{
+  "name": "cyberguard-endpoint-agent",
+  "version": "1.0.0",
+  "description": "CyberGuard Grid Consent-Based Whitelisted Endpoint Agent Prototype",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "test": "tsx --test src/__tests__/*.test.ts",
+    "start": "node dist/index.js",
+    "enroll": "tsx src/index.ts --enroll",
+    "simulate": "tsx src/simulator.ts"
+  },
+  "keywords": [
+    "cyberguard",
+    "endpoint-agent",
+    "remediation"
+  ],
+  "author": "CyberGuard SOC Team",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5"
+  }
+}
+

@@ -74,7 +74,7 @@ export const DLTLedger: React.FC = () => {
 
   const handleAddValidator = async (blockNumber: number) => {
     setIsValidating(true);
-    const validatorName = activeOrg?.name || 'State University';
+    const validatorName = activeOrg?.name || 'University C';
     await validateLedgerBlock(blockNumber, validatorName);
     // Re-verify after adding signature
     await handleVerifyIntegrity(blockNumber);
@@ -83,7 +83,7 @@ export const DLTLedger: React.FC = () => {
 
   const handleMineBlock = async () => {
     if (!newThreatId.trim()) return;
-    await addCustomLedgerBlock(newThreatId.trim(), activeOrg?.name || 'Demo Bank', newHash.trim());
+    await addCustomLedgerBlock(newThreatId.trim(), activeOrg?.name || 'Bank A', newHash.trim());
     const nextSeq = ledgerRecords.length + 9200;
     setNewThreatId(`TH-${nextSeq}`);
   };

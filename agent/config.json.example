@@ -1,0 +1,10 @@
+{
+  "backendUrl": "http://localhost:5000",
+  "wsUrl": "ws://localhost:5000",
+  "deviceId": "DEV-BANK-01",
+  "token": "devtoken-bank-01-prototype",
+  "commandSecret": "secret-cmd-bank-dev-01-prototype",
+  "orgId": "org-1",
+  "hostname": "ALICE-LAPTOP-W11"
+}
+

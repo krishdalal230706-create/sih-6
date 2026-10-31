@@ -2,26 +2,26 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2,
-  ChevronDown,
-  Play,
   Bell,
-  Search,
   Activity,
   ShieldAlert,
   Sparkles,
-  X,
-  Check,
-  Trash2,
-  ExternalLink,
-  AlertTriangle,
-  Database,
-  Radio,
   CheckCircle2,
   BellRing,
   Menu,
-  RotateCcw
+  RotateCcw,
+  User,
+  LogOut,
+  AlertTriangle,
+  Database,
+  Radio,
+  ExternalLink,
+  Trash2,
+  Check
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../api/client';
 
 interface TopbarProps {
   onMenuToggle?: () => void;
@@ -30,8 +30,6 @@ interface TopbarProps {
 export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
   const {
     activeOrg,
-    organizations,
-    switchOrg,
     startDemo,
     isDemoActive,
     resetDemoBaseline,
@@ -43,26 +41,46 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
     clearNotifications
   } = useApp();
 
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { currentUser, logout } = useAuth();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const navigate = useNavigate();
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Check backend DEMO_MODE availability for Demo controls
+  useEffect(() => {
+    api.get<{ demoUsers: any[] }>('/api/auth/demo-users')
+      .then((res) => {
+        if (res && res.demoUsers && res.demoUsers.length > 0) {
+          setIsDemoMode(true);
+        }
+      })
+      .catch(() => {
+        setIsDemoMode(false);
+      });
+  }, []);
 
   // Close panels when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsDropdownOpen(false);
-      }
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setIsNotifOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleSignOut = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   const getNotifIcon = (type: string) => {
     switch (type) {
@@ -94,9 +112,53 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
     }
   };
 
+  // Severity calculation rule: >=80 Critical, >=65 High, >=45 Medium, else Low
+  const currentRiskScore = riskData?.overallRiskScore ?? activeOrg?.riskScore ?? 42;
+  const severityBadge = (() => {
+    if (currentRiskScore >= 80) {
+      return {
+        label: 'CRITICAL',
+        badgeClass: 'bg-rose-950/80 text-rose-400 border-rose-800/60',
+        textClass: 'text-rose-400'
+      };
+    }
+    if (currentRiskScore >= 65) {
+      return {
+        label: 'HIGH',
+        badgeClass: 'bg-orange-950/80 text-orange-400 border-orange-800/60',
+        textClass: 'text-orange-400'
+      };
+    }
+    if (currentRiskScore >= 45) {
+      return {
+        label: 'MEDIUM',
+        badgeClass: 'bg-amber-950/80 text-amber-400 border-amber-800/60',
+        textClass: 'text-amber-400'
+      };
+    }
+    return {
+      label: 'LOW',
+      badgeClass: 'bg-emerald-950/80 text-emerald-400 border-emerald-800/60',
+      textClass: 'text-emerald-400'
+    };
+  })();
+
+  const getOrgDisplayName = (orgId?: string) => {
+    switch (orgId) {
+      case 'org-1':
+        return 'Bank A (Financial Services)';
+      case 'org-2':
+        return 'Hospital B (Healthcare)';
+      case 'org-3':
+        return 'University C (Education)';
+      default:
+        return activeOrg?.name || 'Institutional SOC';
+    }
+  };
+
   return (
     <header className="h-16 bg-[#0F1420]/80 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 flex items-center justify-between sticky top-0 z-20">
-      {/* Left: Mobile Toggle & Organization Switcher */}
+      {/* Left: Mobile Toggle & Static Scoped Organization Banner */}
       <div className="flex items-center space-x-2 sm:space-x-4">
         {/* Mobile Hamburger Toggle */}
         <button
@@ -108,104 +170,66 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="relative" ref={dropdownRef}>
-          <button
-            id="org-switcher-btn"
-            onClick={() => {
-              setIsDropdownOpen(!isDropdownOpen);
-              setIsNotifOpen(false);
-            }}
-            className="flex items-center space-x-2 sm:space-x-3 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700/80 hover:border-cyan-500/50 text-slate-200 transition-all text-xs font-medium max-w-[160px] sm:max-w-xs"
-          >
-            <Building2 className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="font-semibold truncate">{activeOrg?.name || 'Select Organization'}</span>
-            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {isDropdownOpen && (
-            <div className="absolute top-full left-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden py-1">
-              <div className="px-3 py-2 text-[10px] font-mono text-slate-500 uppercase tracking-wider border-b border-slate-800">
-                Switch Organization Context
-              </div>
-              {organizations.map((org) => (
-                <button
-                  key={org.id}
-                  id={`org-switch-${org.id}`}
-                  onClick={() => {
-                    switchOrg(org.id);
-                    setIsDropdownOpen(false);
-                  }}
-                  className={`w-full px-3 py-2.5 text-left text-xs flex items-center justify-between hover:bg-slate-800/80 transition-colors ${
-                    activeOrg?.id === org.id ? 'bg-cyan-950/40 text-cyan-400 font-semibold' : 'text-slate-300'
-                  }`}
-                >
-                  <div className="truncate">
-                    <div className="truncate font-medium">{org.name}</div>
-                    <div className="text-[10px] text-slate-500 truncate">{org.type}</div>
-                  </div>
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ml-2 shrink-0 ${
-                      org.riskScore >= 80
-                        ? 'bg-rose-950 text-rose-400 border-rose-800'
-                        : org.riskScore >= 65
-                        ? 'bg-amber-950 text-amber-400 border-amber-800'
-                        : 'bg-emerald-950 text-emerald-400 border-emerald-800'
-                    }`}
-                  >
-                    {org.riskScore} RS
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+        {/* Static Institutional Name (No Cross-Tenant Switcher) */}
+        <div className="flex items-center space-x-2.5 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700/80 text-slate-200 text-xs font-medium">
+          <Building2 className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span className="font-semibold truncate text-slate-100">
+            {getOrgDisplayName(currentUser?.orgId)}
+          </span>
+          <span className="text-[9px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-1.5 py-0.5 rounded font-mono uppercase">
+            SOC Scoped
+          </span>
         </div>
 
-        {/* Operational Status */}
+        {/* Operational Status Indicator */}
         <div className="hidden xl:flex items-center space-x-2 text-xs font-mono text-slate-400">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span>System Status: <strong className="text-emerald-400">Operational</strong></span>
         </div>
       </div>
 
-      {/* Right Controls & Demo Mode Button */}
-      <div className="flex items-center space-x-2 sm:space-x-4">
-        {/* Dynamic Risk Indicator */}
-        <div className="hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800">
-          <ShieldAlert className="w-4 h-4 text-rose-400" />
-          <span className="text-xs text-slate-400 font-medium">Risk Score:</span>
-          <span className="text-xs font-mono font-bold text-rose-400">
-            {riskData?.overallRiskScore ?? activeOrg?.riskScore ?? 84}/100
+      {/* Right Controls: Dynamic Risk Badge, Demo Controls, Bell, and User Menu */}
+      <div className="flex items-center space-x-2 sm:space-x-3">
+        {/* Shared Dynamic Risk Indicator */}
+        <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800">
+          <ShieldAlert className={`w-4 h-4 ${severityBadge.textClass}`} />
+          <span className="text-xs text-slate-400 font-medium hidden sm:inline">Risk Score:</span>
+          <span className={`text-xs font-mono font-bold ${severityBadge.textClass}`}>
+            {currentRiskScore}/100
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950/80 text-rose-400 font-mono border border-rose-800/60 uppercase">
-            {riskData?.severity ?? 'CRITICAL'}
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono border uppercase font-bold ${severityBadge.badgeClass}`}>
+            {severityBadge.label}
           </span>
         </div>
 
-        {/* Demo Mode Button */}
-        <button
-          id="launch-demo-btn"
-          onClick={startDemo}
-          className={`flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 rounded-lg font-medium text-xs tracking-wide transition-all duration-300 shadow-lg ${
-            isDemoActive
-              ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 ring-2 ring-amber-400/50 shadow-amber-500/20'
-              : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold shadow-cyan-500/25 glow-cyan'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin-slow shrink-0" />
-          <span className="hidden sm:inline">{isDemoActive ? 'DEMO ACTIVE' : 'LAUNCH DEMO'}</span>
-          <span className="sm:hidden">DEMO</span>
-        </button>
+        {/* Demo Mode Button (Appears ONLY when DEMO_MODE is true) */}
+        {isDemoMode && (
+          <>
+            <button
+              id="launch-demo-btn"
+              onClick={startDemo}
+              className={`flex items-center space-x-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg font-medium text-xs tracking-wide transition-all duration-300 shadow-lg ${
+                isDemoActive
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 ring-2 ring-amber-400/50 shadow-amber-500/20'
+                  : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold shadow-cyan-500/25'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 animate-spin-slow shrink-0" />
+              <span className="hidden sm:inline">{isDemoActive ? 'DEMO ACTIVE' : 'LAUNCH DEMO'}</span>
+              <span className="sm:hidden">DEMO</span>
+            </button>
 
-        {/* Reset Demo Baseline Button */}
-        <button
-          id="reset-demo-baseline-btn"
-          onClick={() => resetDemoBaseline()}
-          className="flex items-center space-x-1 px-2.5 py-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-400 hover:text-cyan-300 transition-colors text-xs font-mono"
-          title="Reset to Clean Baseline State"
-        >
-          <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-          <span className="hidden xl:inline">RESET</span>
-        </button>
+            <button
+              id="reset-demo-baseline-btn"
+              onClick={() => resetDemoBaseline()}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-400 hover:text-cyan-300 transition-colors text-xs font-mono"
+              title="Reset Demo Baseline"
+            >
+              <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xl:inline">RESET</span>
+            </button>
+          </>
+        )}
 
         {/* Interactive Notification Bell */}
         <div className="relative" ref={notifRef}>
@@ -213,7 +237,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
             id="notif-bell-btn"
             onClick={() => {
               setIsNotifOpen(!isNotifOpen);
-              setIsDropdownOpen(false);
+              setIsUserMenuOpen(false);
             }}
             className="relative p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-400 hover:text-slate-200 transition-colors"
             title="Notifications Center"
@@ -233,61 +257,42 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
           {/* Notifications Dropdown Panel */}
           {isNotifOpen && (
             <div className="absolute top-full right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 bg-[#0F1420] border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden text-slate-100 animate-fadeIn">
-              {/* Panel Header */}
               <div className="p-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
                 <div className="flex items-center space-x-2">
                   <Bell className="w-4 h-4 text-cyan-400" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Notifications Center</span>
-                  {unreadCount > 0 && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-rose-950 text-rose-400 border border-rose-800">
-                      {unreadCount} unread
-                    </span>
-                  )}
+                  <span className="text-xs font-bold uppercase tracking-wider">Live Security Alerts</span>
                 </div>
-
-                <div className="flex items-center space-x-2 text-[11px] font-mono">
+                <div className="flex items-center space-x-1.5">
                   {unreadCount > 0 && (
                     <button
-                      id="mark-all-read-btn"
                       onClick={markAllNotificationsRead}
-                      className="text-cyan-400 hover:underline flex items-center space-x-1"
+                      className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition-colors"
                       title="Mark all as read"
                     >
-                      <Check className="w-3 h-3" />
-                      <span>Read all</span>
+                      <Check className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {notifications.length > 0 && (
                     <button
-                      id="clear-notifs-btn"
                       onClick={clearNotifications}
-                      className="text-slate-500 hover:text-rose-400 transition-colors"
-                      title="Clear all notifications"
+                      className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors"
+                      title="Clear notifications"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  <button
-                    onClick={() => setIsNotifOpen(false)}
-                    className="text-slate-500 hover:text-slate-300"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
                 </div>
               </div>
 
-              {/* Notifications List */}
-              <div className="max-h-96 overflow-y-auto divide-y divide-slate-800/80">
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/50">
                 {notifications.length === 0 ? (
-                  <div className="p-8 text-center space-y-2">
-                    <Bell className="w-8 h-8 text-slate-700 mx-auto" />
-                    <p className="text-xs text-slate-500 font-mono">No active notifications.</p>
+                  <div className="p-8 text-center text-xs text-slate-500">
+                    No active threat notifications. Institutional posture secure.
                   </div>
                 ) : (
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      id={`notif-${n.id}`}
                       onClick={() => {
                         markNotificationRead(n.id);
                         if (n.link) {
@@ -306,7 +311,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
                         <p className="text-[11px] text-slate-400 leading-normal">{n.message}</p>
                         {n.link && (
                           <div className="text-[10px] font-mono text-cyan-400 flex items-center space-x-1 pt-1">
-                            <span>Go to {n.link}</span>
+                            <span>Inspect alert</span>
                             <ExternalLink className="w-3 h-3" />
                           </div>
                         )}
@@ -318,13 +323,44 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
                   ))
                 )}
               </div>
+            </div>
+          )}
+        </div>
 
-              {/* Footer */}
-              {notifications.length > 0 && (
-                <div className="p-2 border-t border-slate-800 bg-slate-950/40 text-center">
-                  <span className="text-[10px] font-mono text-slate-600">{notifications.length} total notifications</span>
-                </div>
-              )}
+        {/* User Account Menu with Sign Out */}
+        <div className="relative" ref={userMenuRef}>
+          <button
+            onClick={() => {
+              setIsUserMenuOpen(!isUserMenuOpen);
+              setIsNotifOpen(false);
+            }}
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-300 text-xs transition-colors"
+            title="User Account Menu"
+          >
+            <User className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline font-medium">{currentUser?.name?.split(' ')[0] || 'Admin'}</span>
+            <span className="text-[9px] font-mono px-1 rounded uppercase bg-cyan-950 text-cyan-400 border border-cyan-800">
+              {currentUser?.role || 'ADMIN'}
+            </span>
+          </button>
+
+          {isUserMenuOpen && (
+            <div className="absolute top-full right-0 mt-2 w-56 bg-[#0F1420] border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden py-1 animate-fadeIn">
+              <div className="px-3.5 py-2.5 border-b border-slate-800">
+                <div className="font-semibold text-xs text-white truncate">{currentUser?.name}</div>
+                <div className="text-[10px] font-mono text-slate-400 truncate">{currentUser?.email}</div>
+                <div className="text-[10px] font-mono text-cyan-400 pt-1">{getOrgDisplayName(currentUser?.orgId)}</div>
+              </div>
+
+              <div className="p-1">
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center space-x-2 px-3 py-2 text-xs text-rose-300 hover:bg-rose-950/40 rounded-lg transition-colors text-left font-medium"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

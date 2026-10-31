@@ -58,7 +58,7 @@ export const Overview: React.FC = () => {
         { category: 'Data Security', risk: activeOrg.riskBreakdown.dataSecurity, defense: Math.max(10, 100 - activeOrg.riskBreakdown.dataSecurity) },
         { category: 'Network', risk: activeOrg.riskBreakdown.networkSecurity, defense: Math.max(10, 100 - activeOrg.riskBreakdown.networkSecurity) },
         { category: 'Endpoints', risk: activeOrg.riskBreakdown.endpointSecurity, defense: Math.max(10, 100 - activeOrg.riskBreakdown.endpointSecurity) },
-        { category: 'Users / IAM', risk: activeOrg.riskBreakdown.userRisk, defense: Math.max(10, 100 - activeOrg.riskBreakdown.userRisk) }
+        { category: 'Users', risk: activeOrg.riskBreakdown.userRisk, defense: Math.max(10, 100 - activeOrg.riskBreakdown.userRisk) }
       ]
     : [];
 
@@ -84,12 +84,19 @@ export const Overview: React.FC = () => {
   const orgResponseActions = responseActions.filter((a) => a.orgId === activeOrg.id);
   const displayActions = orgResponseActions.slice(0, 4);
 
+  const getCategorySeverity = (score: number) => {
+    if (score >= 80) return { severity: 'Critical', bg: 'bg-rose-950/40 border-rose-800/80 text-rose-400' };
+    if (score >= 65) return { severity: 'High', bg: 'bg-orange-950/40 border-orange-800/80 text-orange-400' };
+    if (score >= 45) return { severity: 'Medium', bg: 'bg-amber-950/40 border-amber-800/80 text-amber-400' };
+    return { severity: 'Low', bg: 'bg-emerald-950/40 border-emerald-800/80 text-emerald-400' };
+  };
+
   const categoryCards = [
-    { title: 'Authentication', score: activeOrg.riskBreakdown.authentication, severity: 'Critical', bg: 'bg-rose-950/40 border-rose-800/80 text-rose-400', link: '/cyber-risk' },
-    { title: 'Data Security', score: activeOrg.riskBreakdown.dataSecurity, severity: 'Critical', bg: 'bg-rose-950/40 border-rose-800/80 text-rose-400', link: '/privacy-engine' },
-    { title: 'Network', score: activeOrg.riskBreakdown.networkSecurity, severity: 'High', bg: 'bg-amber-950/40 border-amber-800/80 text-amber-400', link: '/collaborative-network' },
-    { title: 'Endpoints', score: activeOrg.riskBreakdown.endpointSecurity, severity: 'High', bg: 'bg-amber-950/40 border-amber-800/80 text-amber-400', link: '/threat-detection' },
-    { title: 'Users', score: activeOrg.riskBreakdown.userRisk, severity: 'Medium', bg: 'bg-blue-950/40 border-blue-800/80 text-blue-400', link: '/incidents' }
+    { title: 'Authentication', score: activeOrg.riskBreakdown.authentication, ...getCategorySeverity(activeOrg.riskBreakdown.authentication), link: '/cyber-risk' },
+    { title: 'Data Security', score: activeOrg.riskBreakdown.dataSecurity, ...getCategorySeverity(activeOrg.riskBreakdown.dataSecurity), link: '/privacy-engine' },
+    { title: 'Network', score: activeOrg.riskBreakdown.networkSecurity, ...getCategorySeverity(activeOrg.riskBreakdown.networkSecurity), link: '/collaborative-network' },
+    { title: 'Endpoints', score: activeOrg.riskBreakdown.endpointSecurity, ...getCategorySeverity(activeOrg.riskBreakdown.endpointSecurity), link: '/threat-detection' },
+    { title: 'Users', score: activeOrg.riskBreakdown.userRisk, ...getCategorySeverity(activeOrg.riskBreakdown.userRisk), link: '/incidents' }
   ];
 
   const handleTopActionClick = async (idx: number) => {

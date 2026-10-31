@@ -1007,7 +1007,7 @@ export const ThreatIntelligence: React.FC = () => {
               </div>
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
                 <div className="text-[10px] text-slate-500 uppercase">Origin Node</div>
-                <div className="text-xs font-bold text-slate-200 mt-1 truncate">{broadcastResult.sourceOrg?.name || 'Demo Bank'}</div>
+                <div className="text-xs font-bold text-slate-200 mt-1 truncate">{broadcastResult.sourceOrg?.name || 'Bank A'}</div>
               </div>
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
                 <div className="text-[10px] text-slate-500 uppercase">DLT Ledger</div>

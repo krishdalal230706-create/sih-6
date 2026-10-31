@@ -316,3 +316,152 @@ export interface CorrelationResult {
   earlyWarningTriggered?: boolean;
 }
 
+// Module 8: Endpoint Agent & Auth Types
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'user';
+  orgId: string;
+  status?: 'active' | 'locked' | 'reset_required';
+  mfaRequired?: boolean;
+  privilegeLevel?: 'STANDARD' | 'ELEVATED' | 'ADMIN';
+  mustReset?: boolean;
+  createdAt?: string;
+}
+
+export interface LoginAttempt {
+  id: string;
+  user_id: string | null;
+  email: string;
+  org_id: string;
+  success: number;
+  ip_address: string;
+  device_fingerprint: string;
+  location: string;
+  failure_reason: string | null;
+  timestamp: string;
+}
+
+export interface AccountNotice {
+  id: string;
+  user_id: string;
+  org_id: string;
+  notice_type: string;
+  message: string;
+  created_at: string;
+  acknowledged: number;
+}
+
+export interface AccountFactorContribution {
+  id: string;
+  category: 'Authentication' | 'Device Security' | 'Geographic Velocity' | 'Privilege' | 'Data Access';
+  points: number;
+  explanation: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
+}
+
+export interface AccountAlert {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  orgId: string;
+  status: 'New' | 'Investigating' | 'Remediated';
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  confidence: number;
+  title: string;
+  summary: string;
+  matchedRules: string[];
+  factorContributions: AccountFactorContribution[];
+  accountRiskScore: number;
+  recommendedFixes: string[];
+  timestamp: string;
+  remediatedAt?: string | null;
+  remediatedBy?: string | null;
+}
+
+export interface EndpointDevice {
+  id: string;
+  org_id: string;
+  user_id: string;
+  hostname: string;
+  os: string;
+  status: 'Healthy' | 'Suspicious' | 'Compromised' | 'Isolated' | 'Remediated' | 'Offline';
+  risk: number;
+  last_seen: string;
+  enrolled_at: string;
+  user_email?: string;
+  user_name?: string;
+}
+
+export interface EndpointEvent {
+  id: string;
+  device_id: string;
+  event_type: string;
+  details: string;
+  severity: string;
+  timestamp: string;
+}
+
+export interface RemediationCommand {
+  id: string;
+  device_id: string;
+  action: string;
+  params: string;
+  status: 'Pending' | 'Sent' | 'Executed' | 'Failed' | 'Rejected';
+  issued_by: string;
+  issued_at: string;
+  expires_at: string;
+  nonce: string;
+  signature: string;
+  result?: string | null;
+  result_at?: string | null;
+}
+
+export interface AuditLogRecord {
+  id: string;
+  ts: string;
+  actor: string;
+  org_id: string;
+  device_id: string | null;
+  action: string;
+  details: string;
+  prev_hash: string;
+  hash: string;
+}
+
+export interface MatchedRule {
+  ruleId: string;
+  name: string;
+  description: string;
+  severity: string;
+  points: number;
+}
+
+export interface FactorContribution {
+  id: string;
+  category: string;
+  points: number;
+  explanation: string;
+  severity: string;
+}
+
+export interface DeviceDetection {
+  detected: boolean;
+  deviceId: string;
+  orgId: string;
+  hostname: string;
+  userEmail?: string;
+  status: string;
+  confidence: number;
+  severity: string;
+  title: string;
+  summary: string;
+  matchedRules: MatchedRule[];
+  factorContributions: FactorContribution[];
+  incidentId: string | null;
+  timestamp: string;
+}
+
+

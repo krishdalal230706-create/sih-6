@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   GitCommit,
   User,
@@ -13,12 +14,15 @@ import {
   Zap,
   AlertTriangle,
   Sparkles,
-  Scissors
+  Scissors,
+  Laptop,
+  ExternalLink
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export const AttackPath: React.FC = () => {
-  const { executeResponseAction, responseActions, addNotification, activeOrg, remediateWeakPoint } = useApp();
+  const { executeResponseAction, responseActions, addNotification, activeOrg, remediateWeakPoint, devices } = useApp();
+  const navigate = useNavigate();
   const [selectedNodeId, setSelectedNodeId] = useState<string>('node-2');
   const [deployedNodes, setDeployedNodes] = useState<Record<string, boolean>>({});
   const [whatIfFix, setWhatIfFix] = useState<boolean>(false);
@@ -28,7 +32,7 @@ export const AttackPath: React.FC = () => {
     {
       id: 'node-1',
       title: 'Target User',
-      subtitle: 'Employee Mailbox (admin@demobank.com)',
+      subtitle: 'Employee Mailbox (alice@banka.com)',
       type: 'ENTRY',
       icon: User,
       risk: 45,
@@ -154,11 +158,10 @@ export const AttackPath: React.FC = () => {
           {/* Counterfactual "What if I fix this?" Toggle */}
           <button
             onClick={() => setWhatIfFix(!whatIfFix)}
-            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl border text-xs font-mono font-bold transition-all ${
-              whatIfFix
+            className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl border text-xs font-mono font-bold transition-all ${whatIfFix
                 ? 'bg-emerald-950 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/50'
                 : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
-            }`}
+              }`}
           >
             <Sparkles className={`w-3.5 h-3.5 ${whatIfFix ? 'text-emerald-400 animate-spin' : 'text-slate-400'}`} />
             <span>{whatIfFix ? 'COUNTERFACTUAL ON' : 'WHAT IF I FIX THIS?'}</span>
@@ -166,9 +169,8 @@ export const AttackPath: React.FC = () => {
 
           <div className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-left sm:text-right">
             <div className="text-[10px] font-mono text-slate-400 uppercase font-bold">Composite Path Score</div>
-            <div className={`text-base sm:text-lg font-bold font-mono ${
-              whatIfFix || deployedNodes['node-2'] ? 'text-emerald-400' : 'text-rose-400'
-            }`}>
+            <div className={`text-base sm:text-lg font-bold font-mono ${whatIfFix || deployedNodes['node-2'] ? 'text-emerald-400' : 'text-rose-400'
+              }`}>
               {whatIfFix ? '60 / 100 (PROJECTED)' : deployedNodes['node-2'] ? '58 / 100 — MITIGATED' : '89 / 100 — CRITICAL'}
             </div>
           </div>
@@ -234,17 +236,15 @@ export const AttackPath: React.FC = () => {
                 <React.Fragment key={n.id}>
                   <div
                     onClick={() => setSelectedNodeId(n.id)}
-                    className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center text-center w-36 transition-all duration-300 transform hover:scale-105 relative ${
-                      isSeveredByWhatIf
+                    className={`cursor-pointer p-4 rounded-xl border flex flex-col items-center text-center w-36 transition-all duration-300 transform hover:scale-105 relative ${isSeveredByWhatIf
                         ? 'border-2 border-dashed border-emerald-400 bg-emerald-950/40 ring-2 ring-emerald-500/30'
                         : isDep
-                        ? 'border-emerald-500 text-emerald-400 bg-emerald-950/40'
-                        : isWeakestLink
-                        ? 'border-rose-500 text-rose-400 bg-rose-950/40 glow-red ring-1 ring-rose-500/60'
-                        : n.color
-                    } ${
-                      isSelected ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-950 scale-105' : ''
-                    }`}
+                          ? 'border-emerald-500 text-emerald-400 bg-emerald-950/40'
+                          : isWeakestLink
+                            ? 'border-rose-500 text-rose-400 bg-rose-950/40 glow-red ring-1 ring-rose-500/60'
+                            : n.color
+                      } ${isSelected ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-950 scale-105' : ''
+                      }`}
                   >
                     {isWeakestLink && !isDep && (
                       <span className="absolute -top-2 px-1.5 py-0.5 rounded-full text-[8px] font-bold font-mono bg-rose-600 text-slate-950 animate-pulse tracking-tight">
@@ -331,6 +331,38 @@ export const AttackPath: React.FC = () => {
               <div className="text-[10px] font-mono text-slate-500 uppercase">Exploit Reason</div>
               <p className="text-slate-300">{selectedNode.reason}</p>
             </div>
+
+            {selectedNode.id === 'node-1' && devices.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/30 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-cyan-400 font-bold uppercase">CORRELATED WORKSTATION</span>
+                  <span className="text-slate-500">{devices[0].id}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-slate-200 font-medium">
+                    {devices[0].hostname} ({devices[0].os})
+                  </div>
+                  <span
+                    className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${devices[0].status === 'Compromised'
+                        ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                        : devices[0].status === 'Suspicious'
+                          ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                          : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      }`}
+                  >
+                    {devices[0].status}
+                  </span>
+                </div>
+                <button
+                  onClick={() => navigate(`/endpoints/${devices[0].id}`)}
+                  className="w-full mt-1 py-1.5 px-3 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-600/50 text-cyan-300 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all"
+                >
+                  <Laptop className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Inspect Endpoint Telemetry</span>
+                  <ExternalLink className="w-3 h-3 text-cyan-400 ml-1" />
+                </button>
+              </div>
+            )}
 
             <div className="p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-800/80 space-y-2">
               <div className="text-[10px] font-mono text-cyan-400 uppercase font-bold">Recommended Control</div>

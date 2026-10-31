@@ -42,8 +42,8 @@ const SeverityBadge: React.FC<{ score: number }> = ({ score }) => {
   const s = score >= 80 ? 'CRITICAL' : score >= 65 ? 'HIGH' : score >= 45 ? 'MEDIUM' : 'LOW';
   const cls =
     s === 'CRITICAL' ? 'bg-rose-950 text-rose-400 border-rose-800' :
-    s === 'HIGH'     ? 'bg-amber-950 text-amber-400 border-amber-800' :
-    s === 'MEDIUM'   ? 'bg-blue-950 text-blue-400 border-blue-800' :
+    s === 'HIGH'     ? 'bg-orange-950 text-orange-400 border-orange-800' :
+    s === 'MEDIUM'   ? 'bg-amber-950 text-amber-400 border-amber-800' :
                        'bg-emerald-950 text-emerald-400 border-emerald-800';
   return (
     <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${cls}`}>{s}</span>
@@ -96,7 +96,7 @@ export const Reports: React.FC = () => {
   const activeIncidents  = orgIncidents.filter((i) => i.status !== 'Resolved');
 
   const riskScore  = riskData?.overallRiskScore ?? activeOrg?.riskScore ?? 84;
-  const severity   = riskData?.severity ?? (riskScore >= 80 ? 'CRITICAL' : riskScore >= 65 ? 'HIGH' : 'MEDIUM');
+  const severity   = riskData?.severity ?? (riskScore >= 80 ? 'CRITICAL' : riskScore >= 65 ? 'HIGH' : riskScore >= 45 ? 'MEDIUM' : 'LOW');
 
   // Radar data for risk breakdown
   const radarData = activeOrg ? [

@@ -178,6 +178,159 @@ The repository includes a ready-to-deploy [`render.yaml`](file:///c:/Users/krish
 
 ---
 
+## 🖥️ Module 8: Endpoint Agent & Remote Remediation
+
+Based on institutional security requirements:
+> *"If a user's computer is attacked, the admin should get notified in their admin login and be able to fix things on that user's system remotely."*
+
+Module 8 introduces a consent-based, cryptographic endpoint security agent (`/agent`), real-time dual-channel WebSockets, sliding-window threat heuristics, and an administrative remote remediation action center.
+
+```mermaid
+flowchart LR
+    subgraph Workstation["Machine B: Employee Workstation (/agent)"]
+        AgentCLI["CyberGuard Agent CLI\n(Node.js + TS)"]
+        TrackedProc["Harmless Process\n(demo_suspicious)"]
+        Sandbox["Local Sandbox\n(agent/sandbox/)"]
+    end
+
+    subgraph SOC["Machine A: Central Server & Admin Console"]
+        Backend["Express + tsx Server\n(Port 5000)"]
+        WSHub["Dual WebSocket Hub\n(/ws/agent & /ws/admin)"]
+        DetectionEngine["Sliding Window Engine\n(Heuristics & Waterfall)"]
+        AuditLedger["SHA-256 Audit Chain\n+ DLT Trust Ledger"]
+        AdminUI["React Admin SOC\n(/endpoints/:id)"]
+    end
+
+    subgraph PeerNet["Collaborative Defense Mesh"]
+        HospitalB["Hospital B SOC\n(Early Warning 🔔)"]
+    end
+
+    AgentCLI -- "1. Telemetry Stream (/ws/agent)" --> WSHub
+    WSHub --> DetectionEngine
+    DetectionEngine -- "2. ENDPOINT_ALERT (Real-Time)" --> AdminUI
+    AdminUI -- "3. Issue Signed Command (HMAC-SHA256)" --> Backend
+    Backend -- "4. Signed Command Dispatched" --> AgentCLI
+    AgentCLI -- "5. Terminate / Isolate / Logout" --> TrackedProc
+    AgentCLI -- "6. Execution Result" --> WSHub
+    WSHub -- "7. De-Escalate Org Risk" --> Backend
+    AdminUI -- "8. Share Sanitized Pattern" --> PeerNet
+    PeerNet --> HospitalB
+```
+
+---
+
+### 🛡️ Safety Guarantees & Whitelist Architecture (Mandatory Lab Prototype Design)
+
+CyberGuard Grid strictly complies with ethical and secure prototype engineering standards:
+
+1. **Explicit Consent & Full Visibility**: The agent displays an interactive terminal banner upon start (`CyberGuard Agent running, monitored by <Org>`), logs all activities openly, can be terminated by the workstation user with `Ctrl+C`, and **never** conceals itself or persists across system reboots.
+2. **Whitelist-Only Command Execution**: The agent executes **strictly** the 7 whitelisted administrative actions below with strict schema validation. Arbitrary shell commands, external PIDs, and unverified executables are rejected and logged:
+   - `kill_process`: **Only** terminates processes spawned and tracked by the agent itself (specifically the harmless idle test process `demo_suspicious`). Arbitrary OS PIDs are rejected.
+   - `force_logout`: Invalidates the user's active session tokens and clears local workstation authorization state.
+   - `isolate_device`: Sets a simulated network isolation flag in telemetry without altering host network adapters.
+   - `release_isolation`: Reverses the simulated isolation flag.
+   - `quarantine_file`: Moves suspicious test files inside `agent/sandbox/` into `agent/sandbox/quarantine/`. Path traversal (`..`, absolute paths) is blocked by boundary containment checks.
+   - `reset_credentials`: Flags user credentials as expired in the database, requiring the user to set a new password on their next login attempt.
+   - `collect_diagnostics`: Returns the agent's recent event buffer only.
+3. **Cryptographic HMAC-SHA256 Authentication**: Every administrative command carries `deviceId`, `commandId`, `action`, `params`, `issuedBy`, `issuedAt`, `expiresAt` (60-second TTL), and a unique anti-replay `nonce`. Commands are signed with the per-device secret (`command_secret`). The agent validates signature, TTL, and nonce freshness before executing.
+4. **Tenant Isolation**: Only authenticated admins of the **same organization** can issue commands to that organization's workstations. Cross-tenant command execution returns HTTP 403 and writes an immutable audit record.
+5. **Immutable SHA-256 Audit Log**: Every authentication, threat alert, command issuance, execution result, and tamper attempt is appended to a cryptographic hash-chain (`prev_hash` pointer) with automated anchoring to the DLT Trust Ledger.
+6. **Harmless Attack Simulator**: The attack generator emits deterministic synthetic events and launches an idle loop process (`demo_suspicious`). It runs strictly with `SIMULATION ONLY` tags.
+
+---
+
+### 🌐 Multi-Machine LAN / Wi-Fi Setup Guide
+
+You can run CyberGuard Grid across **two separate laptops** on the same local Wi-Fi / LAN network:
+
+#### 1. Machine A (SOC Command Center & Backend Server)
+1. Find Machine A's local IP address:
+   - Windows: Run `ipconfig` (e.g. `192.168.1.105`)
+   - macOS / Linux: Run `ifconfig` or `ip a`
+2. Start the backend server on Machine A:
+   ```bash
+   cd backend
+   npm run dev
+   ```
+   *(Listens on port 5000 and accepts WebSocket connections on `/ws/agent` and `/ws/admin`)*.
+3. Start the frontend console on Machine A:
+   ```bash
+   cd frontend
+   npm run dev -- --host
+   ```
+4. Log into the SOC Command Center as Bank A Admin:
+   - URL: `http://localhost:5173` (or `http://192.168.1.105:5173`)
+   - Email: `admin@banka.com` | Password: `AdminPass123!`
+5. Navigate to **Endpoints** (`/endpoints`) and click **Enroll Workstation** to generate a one-time enrollment authorization code (e.g. `CG-A1B2-C3D4`).
+
+#### 2. Machine B (Employee Workstation running Agent CLI)
+1. On Machine B, ensure Node.js 18+ is installed.
+2. In `agent/config.json` (or via CLI argument), configure Machine A's LAN IP:
+   ```json
+   {
+     "backendUrl": "http://192.168.1.105:5000",
+     "wsUrl": "ws://192.168.1.105:5000"
+   }
+   ```
+3. Run the one-time enrollment handshake:
+   ```bash
+   cd agent
+   npm run enroll
+   ```
+   Enter the code generated from Machine A (e.g. `CG-A1B2-C3D4`). The agent will receive its unique `deviceId`, per-device `token`, and `commandSecret`.
+4. Start the agent client:
+   ```bash
+   npm run dev
+   ```
+   The terminal will display the consent banner:
+   ```
+   ============================================================
+   🛡️  CYBERGUARD ENDPOINT SECURITY AGENT — ACTIVE MONITORING
+   Monitored Workstation: ALICE-LAPTOP-W11 (DEV-BANK-01)
+   Institutional Organization: org-1 (Bank A)
+   Consent Mode: VISIBLE • NON-STEALTH • WHITELIST ONLY
+   Press Ctrl+C to disconnect and stop agent monitoring at any time.
+   ============================================================
+   ```
+5. Trigger the harmless attack simulation on Machine B:
+   ```bash
+   npm run simulate
+   ```
+   Machine B will spawn harmless process `demo_suspicious` and emit 20 deterministic events. Within 1 second, Machine A's admin console will trigger an `ENDPOINT_ALERT` toast and escalate risk to Critical!
+
+---
+
+### 🎬 Scripted Demo Walkthrough (End-to-End Story)
+
+1. **One-Click Scripted Demo**:
+   - In the SOC Console, navigate to **Endpoints** and click **"Run Endpoint Demo"** (or use the floating Demo Mode controller).
+2. **Step 1: Infiltration & Threat Detection**:
+   - Multi-stage attack injects rapid brute-force logins, anomalous geolocation velocity, privilege escalation (`demo_suspicious`), and high-volume egress.
+   - Sliding-window heuristic engine evaluates rules (`RULE-AUTH-01`, `RULE-PROC-03`, `RULE-DATA-04`), confidence hits 94%, and device transitions to **Compromised**.
+   - Admin receives an instant notification toast: *"🚨 THREAT DETECTED ON ALICE-LAPTOP-W11"*.
+3. **Step 2: Admin Deep Dive & Explainability**:
+   - Clicking the alert navigates to **Device Detail** (`/endpoints/DEV-BANK-01`).
+   - Admin reviews the **Explainability Risk Waterfall** breaking down risk across Authentication (+25), Identity (+18), Endpoint (+26), and Data Egress (+20).
+4. **Step 3: Remote Remediation & Containment**:
+   - Admin clicks **"Kill Suspicious Process"** and **"Force Session Logout"**.
+   - Backend cryptographically signs the commands with HMAC-SHA256 and streams them over WebSocket.
+   - The agent terminates `demo_suspicious` and clears tokens.
+   - Device status updates live to **Remediated**. Organization risk score de-escalates from **88 down to 24** across all SOC visualizers.
+5. **Step 4: User Notice & Forced Password Reset**:
+   - On the employee's **My Device** page (`/my-device`), Alice sees the remediation record: *"Admin ran kill_process and force_logout on your workstation"*.
+   - If credentials were reset, Alice is prompted with the mandatory password reset form.
+6. **Step 5: Collaborative Defense & Peer Early Warning**:
+   - Admin clicks **"Share Sanitized Pattern"**.
+   - PrivacyEngine cryptographically scrubs Alice's email, IP, hostname, and paths.
+   - Abstract pattern `TH-8821` is anchored into the DLT Ledger (Block #10422).
+   - Peer institution **Hospital B** correlates the pattern with 92% similarity and receives an **Early Warning** notification before the adversary can pivot!
+7. **Step 6: Cryptographic Audit Verification**:
+   - Navigate to **Audit Log** (`/audit-log`).
+   - Click **"Verify Hash-Chain"** to confirm SHA-256 integrity across all actions.
+   - Click **"Tamper Record (Demo)"** to witness instant cryptographic detection of modification!
+
+---
+
 ## 🎯 Demo Walkthrough
 
 1. **Overview Dashboard**: Inspect Demo Bank's current composite cyber risk score (84 / Critical), Circular HUD Gauge, Security Posture Radar (NIST CSF & MITRE aligned), and recent SOC telemetry events.
@@ -193,6 +346,25 @@ The repository includes a ready-to-deploy [`render.yaml`](file:///c:/Users/krish
 ---
 
 ## 🔒 Prototype Limitations & Security Notice
+
+### 🔑 Module 8 Demo Credentials (Prototype-Only)
+
+> [!NOTE]
+> All credentials below are provided strictly for SIH prototype evaluation and testing of role-based access control (RBAC), multi-tenancy, and remote remediation. **Do not use in production.**
+
+| Organization | Role | Email | Password | Assigned Endpoint Device |
+| :--- | :--- | :--- | :--- | :--- |
+| **Bank A** (`org-1`) | **SOC Admin** | `admin@banka.com` | `AdminPass123!` | *Full Org Console Access* |
+| **Bank A** (`org-1`) | User | `alice@banka.com` | `UserPass123!` | `DEV-BANK-01` (`ALICE-LAPTOP-W11`) |
+| **Bank A** (`org-1`) | User | `bob@banka.com` | `UserPass123!` | `DEV-BANK-02` (`BOB-FIN-WS02`) |
+| **Hospital B** (`org-2`) | **SOC Admin** | `admin@hospitalb.org` | `AdminPass123!` | *Full Org Console Access* |
+| **Hospital B** (`org-2`) | User | `clara@hospitalb.org` | `UserPass123!` | `DEV-HOSP-01` (`CLARA-MED-TABLET`) |
+| **Hospital B** (`org-2`) | User | `david@hospitalb.org` | `UserPass123!` | `DEV-HOSP-02` (`NURSE-STATION-04`) |
+| **University C** (`org-3`) | **SOC Admin** | `admin@univc.edu` | `AdminPass123!` | *Full Org Console Access* |
+| **University C** (`org-3`) | User | `emma@univc.edu` | `UserPass123!` | `DEV-UNIV-01` (`EMMA-RESEARCH-LAB`) |
+| **University C** (`org-3`) | User | `frank@univc.edu` | `UserPass123!` | `DEV-UNIV-02` (`FRANK-ENG-DESK`) |
+
+---
 
 > **IMPORTANT**: This application is a technology demonstration prototype developed for Smart India Hackathon (SIH).
 > 

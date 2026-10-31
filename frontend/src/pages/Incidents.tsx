@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   Clock,
@@ -9,13 +10,17 @@ import {
   Activity,
   ArrowRight,
   Plus,
-  Zap
+  Zap,
+  Laptop,
+  ExternalLink,
+  Share2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Incident } from '../types';
 
 export const Incidents: React.FC = () => {
-  const { incidents, updateIncidentStatus, executeResponseAction, responseActions, activeOrg } = useApp();
+  const { incidents, updateIncidentStatus, executeResponseAction, responseActions, activeOrg, devices, addNotification } = useApp();
+  const navigate = useNavigate();
   
   // Filter incidents to show only current org's incidents
   const orgIncidents = React.useMemo(() => {
@@ -26,6 +31,38 @@ export const Incidents: React.FC = () => {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(orgIncidents[0] || null);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [newTimelineTitle, setNewTimelineTitle] = useState<string>('');
+  const [sharingPattern, setSharingPattern] = useState<boolean>(false);
+
+  const handleSharePattern = async () => {
+    if (!selectedIncident) return;
+    setSharingPattern(true);
+    try {
+      const activeToken = localStorage.getItem('cyberguard_token');
+      const res = await fetch('/api/privacy/share-endpoint-pattern', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${activeToken}`
+        },
+        body: JSON.stringify({ incidentId: selectedIncident.id })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addNotification(
+          'Pattern Sanitized & Shared',
+          `Threat Pattern ${data.pattern?.patternCode} shared to collaborative network with 5 fields masked. Early warning broadcast to peer institutions.`,
+          'SUCCESS',
+          '/collaborative-network'
+        );
+      } else {
+        alert(data.message || 'Failed to share pattern');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSharingPattern(false);
+    }
+  };
 
   // Update selected incident when org changes
   React.useEffect(() => {
@@ -181,12 +218,40 @@ export const Incidents: React.FC = () => {
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
                 <div className="text-[10px] font-mono text-slate-500 uppercase">Affected Asset</div>
                 <div className="text-slate-200 font-semibold">{selectedIncident.affectedAsset}</div>
+                {(() => {
+                  const linkedDevice = devices.find(d => 
+                    selectedIncident.affectedAsset?.includes(d.id) || 
+                    selectedIncident.affectedAsset?.includes(d.hostname) ||
+                    selectedIncident.id?.includes(d.id.toLowerCase().replace(/[^a-z0-9]/g, ''))
+                  );
+                  if (!linkedDevice) return null;
+                  return (
+                    <button
+                      onClick={() => navigate(`/endpoints/${linkedDevice.id}`)}
+                      className="mt-2 w-full flex items-center justify-center space-x-2 px-3 py-2 bg-cyan-950/70 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/50 rounded-lg text-xs font-semibold transition-all shadow-md shadow-cyan-950/50"
+                    >
+                      <Laptop className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Inspect Enrolled Endpoint ({linkedDevice.id})</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-cyan-400 ml-1" />
+                    </button>
+                  );
+                })()}
               </div>
 
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
                 <div className="text-[10px] font-mono text-slate-500 uppercase">Description</div>
                 <p className="text-slate-300">{selectedIncident.description}</p>
               </div>
+
+              <button
+                type="button"
+                onClick={handleSharePattern}
+                disabled={sharingPattern}
+                className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 hover:to-indigo-800/80 text-purple-200 border border-purple-500/50 rounded-lg text-xs font-semibold transition-all shadow-md shadow-purple-950/50"
+              >
+                <Share2 className="w-3.5 h-3.5 text-purple-400" />
+                <span>{sharingPattern ? 'Sanitizing & Broadcasting...' : 'Share Sanitized Pattern (Collaborative Link)'}</span>
+              </button>
             </div>
 
             {/* Investigation Timeline */}

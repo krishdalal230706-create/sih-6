@@ -71,7 +71,7 @@ class LedgerDatabase {
     const genesisPrevHash = '0000000000000000000000000000000000000000000000000000000000000000';
 
     // Block 10419
-    const b1Validators = ['Insurance Group', 'Demo Bank'];
+    const b1Validators = ['Insurance Group', 'Bank A'];
     const b1Hash = computeBlockHash(
       10419,
       'TH-3901',
@@ -83,7 +83,7 @@ class LedgerDatabase {
     );
 
     // Block 10420
-    const b2Validators = ['FinTech Corp', 'Demo Bank', 'State University'];
+    const b2Validators = ['FinTech Corp', 'Bank A', 'University C'];
     const b2Hash = computeBlockHash(
       10420,
       'TH-4019',
@@ -95,11 +95,11 @@ class LedgerDatabase {
     );
 
     // Block 10421
-    const b3Validators = ['Demo Bank', 'City Hospital', 'State University'];
+    const b3Validators = ['Bank A', 'Hospital B', 'University C'];
     const b3Hash = computeBlockHash(
       10421,
       'TH-7821',
-      'Demo Bank',
+      'Bank A',
       'a8f3b29c91d4e5f670123456789abcdef0123456789abcdef0123456789ab2bd',
       b3Validators,
       '2026-09-04 09:45:10',
@@ -132,7 +132,7 @@ class LedgerDatabase {
       {
         blockNumber: 10421,
         threatId: 'TH-7821',
-        reporterOrg: 'Demo Bank',
+        reporterOrg: 'Bank A',
         validators: b3Validators,
         status: 'CONFIRMED',
         timestamp: '2026-09-04 09:45:10',

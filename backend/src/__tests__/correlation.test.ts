@@ -58,7 +58,7 @@ describe('Order-Aware LCS Correlation & Pattern Matching', () => {
       id: 'tp-1',
       patternCode: 'TH-7821',
       originOrgId: 'org-1',
-      originOrgName: 'Demo Bank',
+      originOrgName: 'Bank A',
       patternSequence: patternSeq,
       severity: 'CRITICAL',
       confidence: 95,
@@ -69,7 +69,7 @@ describe('Order-Aware LCS Correlation & Pattern Matching', () => {
     };
 
     const targetEventsHigh = ['FAILED_LOGIN', 'NEW_DEVICE', 'UNUSUAL_LOCATION', 'PRIVILEGE_ESCALATION', 'LARGE_DATA_TRANSFER'];
-    const corrHigh = correlateThreatPatterns(mockPattern, 'org-2', 'City Hospital', targetEventsHigh);
+    const corrHigh = correlateThreatPatterns(mockPattern, 'org-2', 'Hospital B', targetEventsHigh);
     assert.strictEqual(corrHigh.earlyWarningTriggered, true);
     assert.ok(corrHigh.similarityPercentage >= 65);
 

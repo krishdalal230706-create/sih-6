@@ -203,7 +203,7 @@ export const CollaborativeNetwork: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Originating Node: <strong>{activeBroadcast.sourceOrg?.name || 'Demo Bank'}</strong> • Disseminated across {activeBroadcast.meshPropagation?.length || 4} peer mesh nodes.
+                    Originating Node: <strong>{activeBroadcast.sourceOrg?.name || 'Bank A'}</strong> • Disseminated across {activeBroadcast.meshPropagation?.length || 4} peer mesh nodes.
                   </p>
                 </div>
               </div>

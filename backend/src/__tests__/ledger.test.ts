@@ -17,18 +17,18 @@ describe('DLT Ledger Hashing & Cryptographic Verification', () => {
     const hash1 = computeBlockHash(
       10001,
       'TH-7821',
-      'Demo Bank',
+      'Bank A',
       'a8f3b29c91d4e5f670123456789abcdef0123456789abcdef0123456789ab2bd',
-      ['Demo Bank', 'City Hospital'],
+      ['Bank A', 'Hospital B'],
       '2026-09-04 10:00:00',
       '0000000000000000000000000000000000000000000000000000000000000000'
     );
     const hash2 = computeBlockHash(
       10001,
       'TH-7821',
-      'Demo Bank',
+      'Bank A',
       'a8f3b29c91d4e5f670123456789abcdef0123456789abcdef0123456789ab2bd',
-      ['Demo Bank', 'City Hospital'],
+      ['Bank A', 'Hospital B'],
       '2026-09-04 10:00:00',
       '0000000000000000000000000000000000000000000000000000000000000000'
     );
@@ -73,17 +73,17 @@ describe('DLT Ledger Hashing & Cryptographic Verification', () => {
 
   it('progresses validator workflow from Reported through Quorum to Confirmed', () => {
     restoreLedgerBaseline();
-    const newBlock = addLedgerBlock('TH-UNIT-TEST', 'Demo Bank', 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789', ['Demo Bank']);
+    const newBlock = addLedgerBlock('TH-UNIT-TEST', 'Bank A', 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789', ['Bank A']);
     assert.strictEqual(newBlock.validators.length, 1);
     assert.strictEqual(newBlock.status, 'REPORTED');
 
     // Add 2nd validator -> Verified by 1
-    const v2 = advanceBlockValidation(newBlock.blockNumber, 'City Hospital');
+    const v2 = advanceBlockValidation(newBlock.blockNumber, 'Hospital B');
     assert.ok(v2);
     assert.strictEqual(v2.status, 'Verified by 1');
 
     // Add 3rd validator -> Verified by 3
-    const v3 = advanceBlockValidation(newBlock.blockNumber, 'State University');
+    const v3 = advanceBlockValidation(newBlock.blockNumber, 'University C');
     assert.ok(v3);
     assert.strictEqual(v3.status, 'Verified by 3');
 

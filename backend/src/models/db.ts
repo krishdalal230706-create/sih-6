@@ -16,7 +16,7 @@ class DatabaseStore {
   public organizations: Record<string, Organization> = {
     'org-1': {
       id: 'org-1',
-      name: 'Demo Bank',
+      name: 'Bank A',
       type: 'Financial Services',
       usersCount: 14200,
       criticalSystems: 48,
@@ -45,7 +45,7 @@ class DatabaseStore {
     },
     'org-2': {
       id: 'org-2',
-      name: 'City Hospital',
+      name: 'Hospital B',
       type: 'Healthcare & Lifesciences',
       usersCount: 6500,
       criticalSystems: 32,
@@ -74,7 +74,7 @@ class DatabaseStore {
     },
     'org-3': {
       id: 'org-3',
-      name: 'State University',
+      name: 'University C',
       type: 'Education & Research',
       usersCount: 28000,
       criticalSystems: 25,
@@ -906,7 +906,7 @@ class DatabaseStore {
       id: 'tp-1',
       patternCode: 'TH-7821',
       originOrgId: 'org-1',
-      originOrgName: 'Demo Bank',
+      originOrgName: 'Bank A',
       patternSequence: [
         'FAILED_LOGIN',
         'SUCCESSFUL_LOGIN',
@@ -968,6 +968,10 @@ class DatabaseStore {
     this.responseActions = baseline.responseActions;
     this.threatPatterns = baseline.threatPatterns;
     this.ledgerRecords = ledgerDb.resetToBaseline();
+  }
+
+  public registerOrganization(org: Organization): void {
+    this.organizations[org.id] = org;
   }
 
   public getActiveOrganization(): Organization {

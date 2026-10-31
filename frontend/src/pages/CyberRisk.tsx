@@ -138,8 +138,16 @@ export const CyberRisk: React.FC = () => {
         <div className="glass-panel p-5 sm:p-6 rounded-2xl border border-rose-500/40 bg-gradient-to-br from-rose-950/30 via-slate-900 to-slate-950 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-slate-400 uppercase">OVERALL RISK SCORE</span>
-            <span className="px-2.5 py-1 rounded bg-rose-950 text-rose-400 text-xs font-mono font-bold border border-rose-800">
-              {customCalculatedScore >= 80 ? 'CRITICAL' : customCalculatedScore >= 65 ? 'HIGH' : 'MEDIUM'}
+            <span className={`px-2.5 py-1 rounded text-xs font-mono font-bold border ${
+              customCalculatedScore >= 80
+                ? 'bg-rose-950 text-rose-400 border-rose-800'
+                : customCalculatedScore >= 65
+                ? 'bg-orange-950 text-orange-400 border-orange-800'
+                : customCalculatedScore >= 45
+                ? 'bg-amber-950 text-amber-400 border-amber-800'
+                : 'bg-emerald-950 text-emerald-400 border-emerald-800'
+            }`}>
+              {customCalculatedScore >= 80 ? 'CRITICAL' : customCalculatedScore >= 65 ? 'HIGH' : customCalculatedScore >= 45 ? 'MEDIUM' : 'LOW'}
             </span>
           </div>
 

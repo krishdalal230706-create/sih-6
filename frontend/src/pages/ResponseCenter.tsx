@@ -119,7 +119,7 @@ export const ResponseCenter: React.FC = () => {
             <div>
               <div className="text-[10px] font-mono text-slate-500 uppercase">Current Risk Score</div>
               <div className="text-xs font-bold text-slate-200 font-mono">
-                {riskData?.overallRiskScore ?? activeOrg?.riskScore ?? 84} / 100
+                {riskData?.overallRiskScore ?? activeOrg?.riskScore ?? 42} / 100
               </div>
             </div>
           </div>

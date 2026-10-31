@@ -108,7 +108,7 @@ export const DemoModeController: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2 text-emerald-400 font-bold">
                 <span>✓</span>
-                <span>P2P early warning gossip successfully received by City Hospital & FinTech Corp</span>
+                <span>P2P early warning gossip successfully received by Hospital B & FinTech Corp</span>
               </div>
             </div>
 
@@ -162,6 +162,15 @@ export const DemoModeController: React.FC = () => {
                   </button>
                 );
               })}
+
+              <button
+                onClick={() => navigate('/account-security')}
+                className="px-2.5 sm:px-3 py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold bg-gradient-to-r from-purple-950/80 to-indigo-950/80 border border-purple-500/50 text-purple-300 hover:text-white transition-all flex items-center space-x-1 whitespace-nowrap"
+                title="Launch Module 8: User Account Protection & Remote Fix Demo"
+              >
+                <Sparkles className="w-3 h-3 text-yellow-300" />
+                <span>Account Attack Demo</span>
+              </button>
             </div>
 
             {/* Playback Controls & Reset */}
