@@ -121,7 +121,7 @@ function calculateExpectedRiskReduction(vuln: VulnerabilityRecord): { riskPoints
 export async function optimizeCyberInvestment(options: OptimizationOptions = {}): Promise<OptimizationResult> {
   const budget = Math.max(0, Number(options.budget) ?? 1000000);
 
-  // 1. Fetch real vulnerabilities stored in MySQL database
+  // 1. Fetch real vulnerabilities stored in SQLite database
   const queryResult = await vulnerabilityDb.getVulnerabilities({
     limit: 200,
     minCvss: options.minCvss,

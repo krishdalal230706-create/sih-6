@@ -59,6 +59,7 @@ export interface OptimizationResult {
 }
 
 import { useApp } from '../context/AppContext';
+import { api } from '../api/client';
 
 export const InvestmentOptimization: React.FC = () => {
   const { isDemoActive, demoStep } = useApp();
@@ -89,15 +90,11 @@ export const InvestmentOptimization: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await fetch('/api/investment-optimization', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          budget: budgetVal,
-          minCvss: cvssVal && cvssVal > 0 ? cvssVal : undefined,
-          knownExploitedOnly: kevOnly
-        })
-      }).then((r) => r.json());
+      const res = await api.post<OptimizationResult>('/api/investment-optimization', {
+        budget: budgetVal,
+        minCvss: cvssVal && cvssVal > 0 ? cvssVal : undefined,
+        knownExploitedOnly: kevOnly
+      });
 
       if (res && res.recommendations) {
         setResult(res);
@@ -139,7 +136,7 @@ export const InvestmentOptimization: React.FC = () => {
             </div>
           </div>
           <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-            Given limited cybersecurity resources or budget, CyberGuard Grid evaluates real vulnerability threat intelligence stored in MySQL to mathematically determine which remediations yield the highest justified risk reduction per rupee invested.
+            Given limited cybersecurity resources or budget, CyberGuard Grid evaluates real vulnerability threat intelligence stored in SQLite to mathematically determine which remediations yield the highest justified risk reduction per rupee invested.
           </p>
         </div>
 
@@ -162,7 +159,7 @@ export const InvestmentOptimization: React.FC = () => {
             <span>Cybersecurity Budget & Optimization Parameters</span>
           </h2>
           <span className="text-[10px] sm:text-xs font-mono text-slate-400 bg-slate-800/60 px-3 py-1 rounded-full border border-slate-700">
-            Real MySQL Vulnerability Input
+            Real SQLite Vulnerability Input
           </span>
         </div>
 
@@ -288,6 +285,9 @@ export const InvestmentOptimization: React.FC = () => {
             </div>
             <div className="text-xl sm:text-2xl font-bold text-cyan-400 font-mono">
               +{result.totalRiskReduced} <span className="text-xs font-normal">pts</span>
+            </div>
+            <div className="text-[11px] text-cyan-400/90 font-mono">
+              approx. {result.recommendations && result.recommendations.length > 0 ? Math.min(100, Math.round((result.totalRiskReduced / Math.max(1, result.recommendations.reduce((acc, r) => acc + (r.expectedRiskReduction || 0), 0))) * 100)) : 0}% of total exposure
             </div>
             <div className="text-[11px] text-cyan-500/90 font-mono">Quantified Threat Mitigation</div>
           </div>
