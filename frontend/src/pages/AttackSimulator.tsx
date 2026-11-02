@@ -189,13 +189,13 @@ export const AttackSimulator: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
           <div className="flex items-center space-x-2">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100 uppercase">SAFE ATTACK SIMULATOR</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100 uppercase">BANKING ATTACK SIMULATOR</h1>
             <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-400 text-[10px] font-mono border border-rose-800 font-bold">
-              TTP EMULATOR
+              BANKING TTP EMULATOR
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Simulate adversary tactics, techniques, and procedures (TTPs) using deterministic mock attack progressions.
+            Simulate banking adversary tactics, techniques, and procedures (TTPs) for Demo Bank across 6 controlled scenarios.
           </p>
         </div>
 

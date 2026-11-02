@@ -10,6 +10,7 @@ export interface Organization {
   id: string;
   name: string;
   type: string;
+  country?: string;
   usersCount: number;
   criticalSystems: number;
   internetFacingServices: number;
@@ -30,6 +31,19 @@ export interface Organization {
   };
 }
 
+export interface BankingCategoryScores {
+  authentication: number;
+  coreBanking: number;
+  paymentGateway: number;
+  customerData: number;
+  networkSecurity: number;
+  endpointSecurity: number;
+  atmSecurity: number;
+  thirdParty: number;
+  vulnerabilityExposure: number;
+  incidentHistory: number;
+}
+
 export interface CalculatedRiskResult {
   overallRiskScore: number;
   riskTrend: 'RISING' | 'STABLE' | 'FALLING';
@@ -41,6 +55,22 @@ export interface CalculatedRiskResult {
     endpointSecurity: number;
     userRisk: number;
   };
+  bankingCategoryScores?: BankingCategoryScores;
+  highestRiskAssets?: {
+    id: string;
+    name: string;
+    category: string;
+    riskScore: number;
+    securityStatus: string;
+  }[];
+  recommendations?: string[];
+  explainableDeltas?: {
+    factor: string;
+    weight: string;
+    score: number;
+    weightedImpact: number;
+    explanation: string;
+  }[];
   contributors: {
     id: string;
     name: string;
@@ -463,5 +493,38 @@ export interface DeviceDetection {
   incidentId: string | null;
   timestamp: string;
 }
+
+export interface BankAsset {
+  id: string;
+  orgId: string;
+  name: string;
+  category: string;
+  description: string;
+  criticality: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  ipOrIdentifier: string;
+  technologyStack: string;
+  ownerDepartment: string;
+  securityStatus: 'HEALTHY' | 'DEGRADED' | 'AT_RISK' | 'COMPROMISED' | 'MAINTENANCE';
+  associatedVulnsCount: number;
+  lastAssessmentDate: string;
+  riskScore: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BankSecurityEvent {
+  id: string;
+  orgId: string;
+  affectedAssetId: string;
+  affectedAssetName?: string;
+  eventCategory: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  timestamp: string;
+  description: string;
+  detectionSource: string;
+  investigationStatus: 'NEW' | 'INVESTIGATING' | 'CONTAINED' | 'RESOLVED';
+  recommendedAction: string;
+}
+
 
 

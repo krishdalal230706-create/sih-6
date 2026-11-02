@@ -21,6 +21,7 @@ import {
   ScrollText,
   LogOut,
   UserCheck,
+  Landmark,
   X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -55,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
       heading: 'Monitor',
       items: [
         { name: 'Overview', path: '/', icon: LayoutDashboard },
+        { name: 'Bank Assets', path: '/bank-assets', icon: Landmark, badge: 'BANK' },
         { name: 'Account Security', path: '/account-security', icon: UserCheck, badge: 'HERO' },
         ...(enableEndpointAgent ? [{ name: 'Endpoints', path: '/endpoints', icon: Laptop }] : []),
         { name: 'Incidents', path: '/incidents', icon: AlertTriangle }
@@ -108,13 +110,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
   const getOrgDisplayName = (orgId?: string) => {
     switch (orgId) {
       case 'org-1':
-        return 'Bank A';
+        return 'Demo Bank (India)';
       case 'org-2':
         return 'Hospital B';
       case 'org-3':
         return 'University C';
       default:
-        return activeOrg?.name || 'Institutional SOC';
+        return activeOrg?.name || 'Demo Bank (India)';
     }
   };
 
@@ -146,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
               <h1 className="font-bold text-sm tracking-wider text-slate-100 uppercase">
                 CYBERGUARD <span className="text-cyan-400">GRID</span>
               </h1>
-              <p className="text-[9px] text-slate-400 font-mono tracking-wide">SOC CONSOLE</p>
+              <p className="text-[9px] text-cyan-400/90 font-mono tracking-wide">BANKING SECURITY EDITION</p>
             </div>
           </div>
 

@@ -61,6 +61,37 @@ export interface AccountNoticeRecord {
   acknowledged: number;
 }
 
+export interface BankAssetRecord {
+  id: string;
+  org_id: string;
+  name: string;
+  category: string;
+  description: string;
+  criticality: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  ip_or_identifier: string;
+  technology_stack: string;
+  owner_department: string;
+  security_status: 'HEALTHY' | 'DEGRADED' | 'AT_RISK' | 'COMPROMISED' | 'MAINTENANCE';
+  associated_vulns_count: number;
+  last_assessment_date: string;
+  risk_score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BankSecurityEventRecord {
+  id: string;
+  org_id: string;
+  affected_asset_id: string;
+  event_category: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  timestamp: string;
+  description: string;
+  detection_source: string;
+  investigation_status: 'NEW' | 'INVESTIGATING' | 'CONTAINED' | 'RESOLVED';
+  recommended_action: string;
+}
+
 export interface AccountAlertRecord {
   id: string;
   user_id: string;
@@ -191,6 +222,7 @@ export class EndpointDatabase {
     this.db.pragma('journal_mode = WAL');
     this.initTables();
     this.seedDefaultsIfEmpty();
+    this.seedBankingDataIfEmpty();
   }
 
   private initTables() {
@@ -352,6 +384,38 @@ export class EndpointDatabase {
         created_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS bank_assets (
+        id TEXT PRIMARY KEY,
+        org_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        description TEXT NOT NULL,
+        criticality TEXT NOT NULL CHECK(criticality IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')),
+        ip_or_identifier TEXT NOT NULL,
+        technology_stack TEXT NOT NULL,
+        owner_department TEXT NOT NULL,
+        security_status TEXT NOT NULL CHECK(security_status IN ('HEALTHY', 'DEGRADED', 'AT_RISK', 'COMPROMISED', 'MAINTENANCE')),
+        associated_vulns_count INTEGER NOT NULL DEFAULT 0,
+        last_assessment_date TEXT NOT NULL,
+        risk_score INTEGER NOT NULL DEFAULT 25,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS bank_security_events (
+        id TEXT PRIMARY KEY,
+        org_id TEXT NOT NULL,
+        affected_asset_id TEXT NOT NULL,
+        event_category TEXT NOT NULL,
+        severity TEXT NOT NULL CHECK(severity IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')),
+        timestamp TEXT NOT NULL,
+        description TEXT NOT NULL,
+        detection_source TEXT NOT NULL,
+        investigation_status TEXT NOT NULL CHECK(investigation_status IN ('NEW', 'INVESTIGATING', 'CONTAINED', 'RESOLVED')),
+        recommended_action TEXT NOT NULL,
+        FOREIGN KEY (affected_asset_id) REFERENCES bank_assets(id)
+      );
+
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_orgs_join_code ON organizations(join_code);
       CREATE INDEX IF NOT EXISTS idx_devices_org ON devices(org_id);
@@ -367,11 +431,17 @@ export class EndpointDatabase {
       CREATE INDEX IF NOT EXISTS idx_alerts_user ON account_alerts(user_id);
       CREATE INDEX IF NOT EXISTS idx_alerts_org ON account_alerts(org_id);
       CREATE INDEX IF NOT EXISTS idx_alerts_status ON account_alerts(status);
+      CREATE INDEX IF NOT EXISTS idx_bank_assets_org ON bank_assets(org_id);
+      CREATE INDEX IF NOT EXISTS idx_bank_assets_crit ON bank_assets(criticality);
+      CREATE INDEX IF NOT EXISTS idx_bank_events_org ON bank_security_events(org_id);
+      CREATE INDEX IF NOT EXISTS idx_bank_events_asset ON bank_security_events(affected_asset_id);
+      CREATE INDEX IF NOT EXISTS idx_bank_events_status ON bank_security_events(investigation_status);
     `);
 
     try { this.db.exec("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active';"); } catch {}
     try { this.db.exec("ALTER TABLE users ADD COLUMN mfa_required INTEGER NOT NULL DEFAULT 0;"); } catch {}
     try { this.db.exec("ALTER TABLE users ADD COLUMN privilege_level TEXT NOT NULL DEFAULT 'STANDARD';"); } catch {}
+    try { this.db.exec("UPDATE organizations SET name = 'Demo Bank', type = 'Banking and Financial Services' WHERE id = 'org-1';"); } catch {}
   }
 
   public seedDefaultsIfEmpty() {
@@ -1031,6 +1101,383 @@ export class EndpointDatabase {
   public getActiveSessions(userId: string): SessionRecord[] {
     const now = new Date().toISOString();
     return this.db.prepare('SELECT * FROM sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?').all(userId, now) as SessionRecord[];
+  }
+
+  // Banking Security Edition Seeding
+  public seedBankingDataIfEmpty() {
+    try {
+      this.db.prepare("UPDATE organizations SET name = 'Demo Bank', type = 'Banking and Financial Services' WHERE id = 'org-1'").run();
+    } catch {}
+
+    // Seed Demo Bank Admin if missing
+    const existingDemoAdmin = this.db.prepare('SELECT id FROM users WHERE email = ?').get('admin@demobank.com');
+    if (!existingDemoAdmin) {
+      const adminPassHash = bcrypt.hashSync('AdminPass123!', 10);
+      this.db.prepare(`
+        INSERT OR REPLACE INTO users (id, org_id, name, email, password_hash, role, status, mfa_required, privilege_level, must_reset, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run('usr-bank-soc-admin', 'org-1', 'Bank SOC Administrator', 'admin@demobank.com', adminPassHash, 'admin', 'active', 0, 'ADMIN', 0, new Date().toISOString());
+    }
+
+    // Seed Banking Assets if empty
+    const assetCount = (this.db.prepare('SELECT COUNT(*) as count FROM bank_assets').get() as { count: number }).count;
+    if (assetCount === 0) {
+      console.log('🏦 [EndpointDb] Seeding 10 synthetic banking assets for Demo Bank (org-1)...');
+      const now = new Date().toISOString();
+      const assets: BankAssetRecord[] = [
+        {
+          id: 'asset-cbs',
+          org_id: 'org-1',
+          name: 'Core Banking System (Finacle CBS Cluster)',
+          category: 'Core Banking',
+          description: 'Central ledger and real-time transaction processing engine for savings, current accounts, and NEFT/RTGS clearing.',
+          criticality: 'CRITICAL',
+          ip_or_identifier: '10.10.1.50',
+          technology_stack: 'Red Hat Enterprise Linux 9 / Finacle Core',
+          owner_department: 'Core Banking Ops',
+          security_status: 'HEALTHY',
+          associated_vulns_count: 1,
+          last_assessment_date: '2026-11-01',
+          risk_score: 28,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-netbank',
+          org_id: 'org-1',
+          name: 'Internet Banking Server',
+          category: 'Internet Banking',
+          description: 'Customer internet banking web portal, session authentication, and balance inquiry microservices.',
+          criticality: 'CRITICAL',
+          ip_or_identifier: '10.10.2.20',
+          technology_stack: 'Ubuntu 22.04 LTS / Nginx Reverse Proxy',
+          owner_department: 'Digital Banking',
+          security_status: 'AT_RISK',
+          associated_vulns_count: 4,
+          last_assessment_date: '2026-11-02',
+          risk_score: 65,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-mobile',
+          org_id: 'org-1',
+          name: 'Mobile Banking Application Gateway',
+          category: 'Mobile Banking',
+          description: 'API gateway handling iOS and Android mobile banking traffic, biometrics, and MPIN verification.',
+          criticality: 'HIGH',
+          ip_or_identifier: '10.10.2.35',
+          technology_stack: 'Kubernetes Microservices / Node.js & Go',
+          owner_department: 'Digital Banking',
+          security_status: 'HEALTHY',
+          associated_vulns_count: 2,
+          last_assessment_date: '2026-10-28',
+          risk_score: 32,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-atm',
+          org_id: 'org-1',
+          name: 'ATM Network Controller & Switch',
+          category: 'ATM Infrastructure',
+          description: 'Centralized switch interconnecting 450+ ATM kiosks with NPCI NFS switch and card authorization.',
+          criticality: 'HIGH',
+          ip_or_identifier: '10.20.5.10',
+          technology_stack: 'Windows Server 2022 IoT / Base24-eps',
+          owner_department: 'ATM Operations',
+          security_status: 'HEALTHY',
+          associated_vulns_count: 3,
+          last_assessment_date: '2026-10-30',
+          risk_score: 40,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-payment',
+          org_id: 'org-1',
+          name: 'UPI & Payment Gateway Processor',
+          category: 'Payment Gateway',
+          description: 'High-throughput payment gateway processing IMPS, UPI 2.0, debit card clearing, and merchant settlement.',
+          criticality: 'CRITICAL',
+          ip_or_identifier: '10.10.3.15',
+          technology_stack: 'Red Hat Enterprise Linux 8.8 / ISO 8583 Engine',
+          owner_department: 'Payment Systems',
+          security_status: 'COMPROMISED',
+          associated_vulns_count: 7,
+          last_assessment_date: '2026-11-02',
+          risk_score: 88,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-custdb',
+          org_id: 'org-1',
+          name: 'Customer Information Database (CIF)',
+          category: 'Customer Database',
+          description: 'Master repository for Customer Information Files (CIF), KYC documentation, Aadhaar/PAN tokens, and PII.',
+          criticality: 'CRITICAL',
+          ip_or_identifier: '10.10.4.10',
+          technology_stack: 'Oracle Database 19c Enterprise RAC',
+          owner_department: 'Data Governance & Compliance',
+          security_status: 'HEALTHY',
+          associated_vulns_count: 2,
+          last_assessment_date: '2026-10-25',
+          risk_score: 35,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-workstations',
+          org_id: 'org-1',
+          name: 'Branch Employee Workstations Fleet',
+          category: 'Workstations & Endpoints',
+          description: 'Fleet of teller and branch manager desktop workstations across 24 regional branch offices.',
+          criticality: 'MEDIUM',
+          ip_or_identifier: '10.30.0.0/24',
+          technology_stack: 'Windows 11 Enterprise (GPO Managed)',
+          owner_department: 'IT Helpdesk & Branch Support',
+          security_status: 'DEGRADED',
+          associated_vulns_count: 5,
+          last_assessment_date: '2026-10-29',
+          risk_score: 58,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-auth',
+          org_id: 'org-1',
+          name: 'Authentication Server & HSM Cluster',
+          category: 'Authentication Server',
+          description: 'Hardware Security Module (HSM) cluster for PIN verification, digital signatures, and banking PKI.',
+          criticality: 'CRITICAL',
+          ip_or_identifier: '10.10.1.12',
+          technology_stack: 'Thales Luna HSM / FreeIPA Keycloak',
+          owner_department: 'Information Security (CISO Office)',
+          security_status: 'HEALTHY',
+          associated_vulns_count: 0,
+          last_assessment_date: '2026-11-01',
+          risk_score: 22,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-network',
+          org_id: 'org-1',
+          name: 'Bank Internal Core Network',
+          category: 'Internal Network',
+          description: 'Core MPLS and SD-WAN backbone linking data centers, disaster recovery sites, and branch offices.',
+          criticality: 'HIGH',
+          ip_or_identifier: '10.0.0.0/16',
+          technology_stack: 'Cisco Catalyst SD-WAN / Palo Alto NGFW',
+          owner_department: 'Network Infrastructure',
+          security_status: 'HEALTHY',
+          associated_vulns_count: 1,
+          last_assessment_date: '2026-10-27',
+          risk_score: 30,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'asset-dr',
+          org_id: 'org-1',
+          name: 'Backup & Disaster Recovery System',
+          category: 'Disaster Recovery',
+          description: 'Off-site disaster recovery site in Hyderabad with synchronous storage replication and immutable backups.',
+          criticality: 'CRITICAL',
+          ip_or_identifier: '10.50.1.10',
+          technology_stack: 'Veeam Backup & Replication / Commvault / NetApp',
+          owner_department: 'Business Continuity & DR',
+          security_status: 'HEALTHY',
+          associated_vulns_count: 0,
+          last_assessment_date: '2026-10-26',
+          risk_score: 20,
+          created_at: now,
+          updated_at: now
+        }
+      ];
+
+      for (const a of assets) {
+        this.saveBankAsset(a);
+      }
+    }
+
+    // Seed Security Events if empty
+    const eventCount = (this.db.prepare('SELECT COUNT(*) as count FROM bank_security_events').get() as { count: number }).count;
+    if (eventCount === 0) {
+      console.log('🚨 [EndpointDb] Seeding 5 initial banking security events for Demo Bank...');
+      const now = new Date();
+      const events: BankSecurityEventRecord[] = [
+        {
+          id: 'evt-001',
+          org_id: 'org-1',
+          affected_asset_id: 'asset-payment',
+          event_category: 'Payment Fraud Anomaly',
+          severity: 'CRITICAL',
+          timestamp: new Date(now.getTime() - 12 * 60 * 1000).toISOString(),
+          description: 'UPI velocity spike: 420 micro-debits/min originating from botnet proxies targeting merchant settlement account.',
+          detection_source: 'UPI Transaction Sentry AI',
+          investigation_status: 'INVESTIGATING',
+          recommended_action: 'Trigger velocity throttling on suspect VPA endpoints and alert Fraud Monitoring Team.'
+        },
+        {
+          id: 'evt-002',
+          org_id: 'org-1',
+          affected_asset_id: 'asset-netbank',
+          event_category: 'Credential Stuffing',
+          severity: 'HIGH',
+          timestamp: new Date(now.getTime() - 45 * 60 * 1000).toISOString(),
+          description: 'Distributed credential stuffing attack: 1,840 failed login attempts across 340 distinct proxy IPs within 5 minutes.',
+          detection_source: 'WAF Rate Limiter & Threat Intel',
+          investigation_status: 'CONTAINED',
+          recommended_action: 'Enforce mandatory CAPTCHA and Step-Up OTP for affected IP CIDR blocks.'
+        },
+        {
+          id: 'evt-003',
+          org_id: 'org-1',
+          affected_asset_id: 'asset-workstations',
+          event_category: 'Endpoint Security',
+          severity: 'MEDIUM',
+          timestamp: new Date(now.getTime() - 3 * 3600 * 1000).toISOString(),
+          description: 'Unauthorized USB mass storage device connected to Teller Workstation WS-04 at Connaught Place branch.',
+          detection_source: 'Endpoint DLP Agent',
+          investigation_status: 'RESOLVED',
+          recommended_action: 'Device port blocked automatically by Group Policy and notified branch manager.'
+        },
+        {
+          id: 'evt-004',
+          org_id: 'org-1',
+          affected_asset_id: 'asset-cbs',
+          event_category: 'Unauthorized Access',
+          severity: 'HIGH',
+          timestamp: new Date(now.getTime() - 6 * 3600 * 1000).toISOString(),
+          description: 'Bulk customer account balance query initiated outside normal clearing window (02:14 AM IST) from internal subnet.',
+          detection_source: 'Database Activity Monitoring (DAM)',
+          investigation_status: 'NEW',
+          recommended_action: 'Verify audit authorization for query batch with Head of Core Operations.'
+        },
+        {
+          id: 'evt-005',
+          org_id: 'org-1',
+          affected_asset_id: 'asset-atm',
+          event_category: 'Network Telemetry',
+          severity: 'LOW',
+          timestamp: new Date(now.getTime() - 14 * 3600 * 1000).toISOString(),
+          description: 'ATM Switch secondary route jitter (+140ms) detected on Western Zone multiplexer.',
+          detection_source: 'Network Performance Monitor',
+          investigation_status: 'RESOLVED',
+          recommended_action: 'Failover switch route verified healthy; latency restored to under 12ms.'
+        }
+      ];
+
+      for (const e of events) {
+        this.saveBankSecurityEvent(e);
+      }
+    }
+  }
+
+  // Banking Asset CRUD Methods
+  public getBankAssets(orgId: string): BankAssetRecord[] {
+    return this.db.prepare('SELECT * FROM bank_assets WHERE org_id = ? ORDER BY risk_score DESC').all(orgId) as BankAssetRecord[];
+  }
+
+  public getBankAssetById(id: string): BankAssetRecord | undefined {
+    return this.db.prepare('SELECT * FROM bank_assets WHERE id = ?').get(id) as BankAssetRecord | undefined;
+  }
+
+  public saveBankAsset(asset: BankAssetRecord): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO bank_assets (
+        id, org_id, name, category, description, criticality,
+        ip_or_identifier, technology_stack, owner_department,
+        security_status, associated_vulns_count, last_assessment_date,
+        risk_score, created_at, updated_at
+      ) VALUES (
+        @id, @org_id, @name, @category, @description, @criticality,
+        @ip_or_identifier, @technology_stack, @owner_department,
+        @security_status, @associated_vulns_count, @last_assessment_date,
+        @risk_score, @created_at, @updated_at
+      )
+    `).run(asset);
+  }
+
+  public updateBankAsset(id: string, updates: Partial<BankAssetRecord>): BankAssetRecord | undefined {
+    const existing = this.getBankAssetById(id);
+    if (!existing) return undefined;
+    const updated: BankAssetRecord = {
+      ...existing,
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+    this.saveBankAsset(updated);
+    return updated;
+  }
+
+  public deleteBankAsset(id: string): boolean {
+    const result = this.db.prepare('DELETE FROM bank_assets WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  // Banking Security Events CRUD Methods
+  public getBankSecurityEvents(
+    orgId: string,
+    limit = 50,
+    filters?: { severity?: string; assetId?: string; status?: string }
+  ): (BankSecurityEventRecord & { affected_asset_name?: string })[] {
+    let sql = `
+      SELECT e.*, a.name as affected_asset_name
+      FROM bank_security_events e
+      LEFT JOIN bank_assets a ON e.affected_asset_id = a.id
+      WHERE e.org_id = ?
+    `;
+    const params: any[] = [orgId];
+
+    if (filters?.severity) {
+      sql += ' AND e.severity = ?';
+      params.push(filters.severity);
+    }
+    if (filters?.assetId) {
+      sql += ' AND e.affected_asset_id = ?';
+      params.push(filters.assetId);
+    }
+    if (filters?.status) {
+      sql += ' AND e.investigation_status = ?';
+      params.push(filters.status);
+    }
+
+    sql += ' ORDER BY e.timestamp DESC LIMIT ?';
+    params.push(limit);
+
+    return this.db.prepare(sql).all(...params) as (BankSecurityEventRecord & { affected_asset_name?: string })[];
+  }
+
+  public getBankSecurityEventById(id: string): (BankSecurityEventRecord & { affected_asset_name?: string }) | undefined {
+    return this.db.prepare(`
+      SELECT e.*, a.name as affected_asset_name
+      FROM bank_security_events e
+      LEFT JOIN bank_assets a ON e.affected_asset_id = a.id
+      WHERE e.id = ?
+    `).get(id) as (BankSecurityEventRecord & { affected_asset_name?: string }) | undefined;
+  }
+
+  public saveBankSecurityEvent(event: BankSecurityEventRecord): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO bank_security_events (
+        id, org_id, affected_asset_id, event_category, severity,
+        timestamp, description, detection_source, investigation_status, recommended_action
+      ) VALUES (
+        @id, @org_id, @affected_asset_id, @event_category, @severity,
+        @timestamp, @description, @detection_source, @investigation_status, @recommended_action
+      )
+    `).run(event);
+  }
+
+  public updateBankSecurityEventStatus(
+    id: string,
+    status: 'NEW' | 'INVESTIGATING' | 'CONTAINED' | 'RESOLVED'
+  ): (BankSecurityEventRecord & { affected_asset_name?: string }) | undefined {
+    this.db.prepare('UPDATE bank_security_events SET investigation_status = ? WHERE id = ?').run(status, id);
+    return this.getBankSecurityEventById(id);
   }
 
   // Reset to Baseline for Demo

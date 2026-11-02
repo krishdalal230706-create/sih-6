@@ -18,6 +18,7 @@ export interface Organization {
   id: string;
   name: string;
   type: string;
+  country?: string;
   usersCount: number;
   criticalSystems: number;
   internetFacingServices: number;
@@ -168,6 +169,38 @@ export interface CorrelationResult {
     alignedBreakdown: AlignedEventBreakdown[];
   };
   earlyWarningTriggered?: boolean;
+}
+
+export interface BankAsset {
+  id: string;
+  orgId: string;
+  name: string;
+  category: string;
+  description: string;
+  criticality: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  ipOrIdentifier: string;
+  technologyStack: string;
+  ownerDepartment: string;
+  securityStatus: 'HEALTHY' | 'DEGRADED' | 'AT_RISK' | 'COMPROMISED' | 'MAINTENANCE';
+  associatedVulnsCount: number;
+  lastAssessmentDate: string;
+  riskScore: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BankSecurityEvent {
+  id: string;
+  orgId: string;
+  affectedAssetId: string;
+  affectedAssetName?: string;
+  eventCategory: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  timestamp: string;
+  description: string;
+  detectionSource: string;
+  investigationStatus: 'NEW' | 'INVESTIGATING' | 'CONTAINED' | 'RESOLVED';
+  recommendedAction: string;
 }
 
 export * from './types/vulnerability.js';

@@ -26,6 +26,7 @@ import { AccountSecurity } from './pages/AccountSecurity';
 import { AccountDetail } from './pages/AccountDetail';
 import { Endpoints } from './pages/Endpoints';
 import { DeviceDetail } from './pages/DeviceDetail';
+import { BankAssets } from './pages/BankAssets';
 import { AuditLog } from './pages/AuditLog';
 import { Forbidden } from './pages/Forbidden';
 import { NotFound } from './pages/NotFound';
@@ -50,6 +51,7 @@ export const App: React.FC = () => {
             {/* Admin Institutional SOC Console (role=admin only) */}
             <Route element={<AdminLayout />}>
               <Route path="/" element={<Overview />} />
+              <Route path="/bank-assets" element={<BankAssets />} />
               <Route path="/account-security" element={<AccountSecurity />} />
               <Route path="/account-security/:userId" element={<AccountDetail />} />
               <Route path="/endpoints" element={<Endpoints />} />

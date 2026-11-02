@@ -16,6 +16,7 @@ import { accountSecurityRouter } from './routes/accountSecurity.js';
 import { deviceRouter } from './routes/devices.js';
 import { commandRouter } from './routes/commands.js';
 import { auditRouter } from './routes/audit.js';
+import { bankAssetRouter } from './routes/bankAssets.js';
 import { calculateOrganizationRisk } from './engine/riskEngine.js';
 import { correlateThreatPatterns } from './engine/correlationEngine.js';
 import { sanitizeIncidentToPattern, sanitizeEndpointEventsToPattern, sanitizeAccountAlertToPattern } from './engine/privacyEngine.js';
@@ -93,6 +94,9 @@ if (AUTH_CONFIG.ENABLE_ENDPOINT_AGENT) {
 
 // Cryptographic Audit Trail & Hash Chain Routes
 app.use('/api/audit', auditRouter);
+
+// Banking Assets & Security Events Routes (Banking Security Edition)
+app.use('/api/bank-assets', bankAssetRouter);
 
 // Logger middleware
 app.use((req, res, next) => {
