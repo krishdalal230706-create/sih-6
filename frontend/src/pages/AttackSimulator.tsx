@@ -25,15 +25,20 @@ import { useApp } from '../context/AppContext';
 import { AttackScenario } from '../types';
 
 export const AttackSimulator: React.FC = () => {
-  const { attackScenarios, simulateAttack, remediateWeakPoint, activeOrg } = useApp();
+  const { attackScenarios, simulateAttack, remediateWeakPoint, activeOrg, token, addNotification } = useApp();
   const navigate = useNavigate();
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('scenario-1');
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('scenario-3');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [isPlayingSteps, setIsPlayingSteps] = useState<boolean>(false);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(-1);
   const [isRemediating, setIsRemediating] = useState<boolean>(false);
   const [remediationSuccess, setRemediationSuccess] = useState<any>(null);
   const [whatIfFix, setWhatIfFix] = useState<boolean>(false);
+
+  // Live SOC Threat Injection State (Live Demo Bridge)
+  const [injectingLive, setInjectingLive] = useState<boolean>(false);
+  const [liveInjectedEvent, setLiveInjectedEvent] = useState<any>(null);
+  const [remediatingLive, setRemediatingLive] = useState<boolean>(false);
 
   const fallbackScenario: AttackScenario = {
     id: 'scenario-1',
@@ -133,8 +138,70 @@ export const AttackSimulator: React.FC = () => {
 
     if (scenario?.id) {
       await simulateAttack(scenario.id);
+      // Auto-bridge into live SOC telemetry
+      await handleInjectLiveThreat();
     }
     setIsSimulating(false);
+  };
+
+  const handleInjectLiveThreat = async () => {
+    if (!token) return;
+    setInjectingLive(true);
+    try {
+      const res = await fetch('/api/bank-assets/simulate-scenario', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ scenarioId: selectedScenarioId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLiveInjectedEvent(data);
+        addNotification(
+          `🚨 ${data.event.eventCategory}`,
+          `${data.event.description} (Risk spiked on ${data.affectedAsset.name})`,
+          'ALERT',
+          '/'
+        );
+      }
+    } catch (err) {
+      console.error('Failed to inject live threat:', err);
+    } finally {
+      setInjectingLive(false);
+    }
+  };
+
+  const handleRemediateLiveThreat = async () => {
+    if (!token) return;
+    setRemediatingLive(true);
+    try {
+      const res = await fetch('/api/bank-assets/remediate-incident', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          assetId: liveInjectedEvent?.affectedAsset?.id,
+          eventId: liveInjectedEvent?.event?.id
+        })
+      });
+      if (res.ok) {
+        addNotification(
+          '✅ Threat Neutralized',
+          'Demo Bank SOC Playbook executed. Asset restored to Healthy baseline.',
+          'SUCCESS',
+          '/'
+        );
+        setLiveInjectedEvent(null);
+      }
+    } catch (err) {
+      console.error('Failed to remediate threat:', err);
+    } finally {
+      setRemediatingLive(false);
+    }
   };
 
   const handleRemediateClick = async () => {
@@ -200,29 +267,81 @@ export const AttackSimulator: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
-          {/* Counterfactual "What if I fix this?" Toggle */}
-          <button
-            onClick={() => setWhatIfFix(!whatIfFix)}
-            className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl border text-xs font-mono font-bold transition-all ${
-              whatIfFix
-                ? 'bg-emerald-950 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/50'
-                : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${whatIfFix ? 'text-emerald-400 animate-spin' : 'text-slate-400'}`} />
-            <span>{whatIfFix ? 'WHAT-IF ACTIVE (-24 PTS)' : 'WHAT IF I FIX THIS?'}</span>
-          </button>
+      {/* Counterfactual "What if I fix this?" Toggle */}
+      <button
+        onClick={() => setWhatIfFix(!whatIfFix)}
+        className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl border text-xs font-mono font-bold transition-all ${
+          whatIfFix
+            ? 'bg-emerald-950 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/50'
+            : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+        }`}
+      >
+        <Sparkles className={`w-3.5 h-3.5 ${whatIfFix ? 'text-emerald-400 animate-spin' : 'text-slate-400'}`} />
+        <span>{whatIfFix ? 'WHAT-IF ACTIVE (-24 PTS)' : 'WHAT IF I FIX THIS?'}</span>
+      </button>
 
-          <button
-            onClick={handleRunSimulation}
-            disabled={isSimulating}
-            className="flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 via-red-600 to-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-rose-500/20 glow-red hover:opacity-90 disabled:opacity-50"
-          >
-            <Play className={`w-4 h-4 fill-slate-950 shrink-0 ${isSimulating ? 'animate-spin' : ''}`} />
-            <span>{isSimulating ? 'SIMULATING PROGRESSION...' : 'RUN FULL SIMULATION'}</span>
-          </button>
+      <button
+        onClick={handleInjectLiveThreat}
+        disabled={injectingLive}
+        className="flex items-center space-x-2 px-4 py-2.5 rounded-xl border border-rose-500/50 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-mono font-bold transition-all"
+        title="Trigger live security alert in Bank SOC"
+      >
+        <AlertTriangle className={`w-3.5 h-3.5 text-rose-400 ${injectingLive ? 'animate-spin' : ''}`} />
+        <span>{injectingLive ? 'INJECTING LIVE SOC...' : 'INJECT LIVE SOC ALERT'}</span>
+      </button>
+
+      <button
+        onClick={handleRunSimulation}
+        disabled={isSimulating}
+        className="flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 via-red-600 to-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-rose-500/20 glow-red hover:opacity-90 disabled:opacity-50"
+      >
+        <Play className={`w-4 h-4 fill-slate-950 shrink-0 ${isSimulating ? 'animate-spin' : ''}`} />
+        <span>{isSimulating ? 'SIMULATING PROGRESSION...' : 'RUN FULL SIMULATION'}</span>
+      </button>
+    </div>
+  </div>
+
+  {/* Live Demo Bridge Alert Banner */}
+  {liveInjectedEvent && (
+    <div className="p-4 rounded-xl bg-gradient-to-r from-rose-950/80 via-slate-900 to-rose-950/80 border-2 border-rose-500 text-rose-200 text-xs font-mono flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fadeIn shadow-xl shadow-rose-950/60">
+      <div className="flex items-center space-x-3">
+        <span className="flex h-3 w-3 relative shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+        </span>
+        <div>
+          <div className="font-bold text-sm text-rose-300 uppercase tracking-wide flex items-center gap-2">
+            <span>LIVE SOC INCIDENT TRIGGERED: {liveInjectedEvent.event.eventCategory}</span>
+            <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 text-[10px]">
+              {liveInjectedEvent.event.severity}
+            </span>
+          </div>
+          <p className="text-slate-300 text-xs mt-0.5">
+            Target Asset: <strong className="text-white">{liveInjectedEvent.affectedAsset.name}</strong> • Risk Spiked: <strong className="text-rose-400">+{liveInjectedEvent.riskSpike} pts</strong>
+          </p>
         </div>
       </div>
+
+      <div className="flex items-center space-x-2 shrink-0">
+        <button
+          onClick={() => navigate('/')}
+          className="px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-500 text-cyan-400 text-xs font-bold transition-all flex items-center gap-1"
+        >
+          <span>View in Bank SOC</span>
+          <ArrowUpRight className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={handleRemediateLiveThreat}
+          disabled={remediatingLive}
+          className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20"
+        >
+          <Zap className={`w-3.5 h-3.5 fill-slate-950 ${remediatingLive ? 'animate-spin' : ''}`} />
+          <span>{remediatingLive ? 'Remediating...' : 'Execute Containment Playbook'}</span>
+        </button>
+      </div>
+    </div>
+  )}
 
       {/* What-If Counterfactual Projected Banner */}
       {whatIfFix && !remediationSuccess && (

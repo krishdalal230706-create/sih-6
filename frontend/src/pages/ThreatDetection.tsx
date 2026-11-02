@@ -132,11 +132,10 @@ export const ThreatDetection: React.FC = () => {
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setIsAutoStreaming(!isAutoStreaming)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all border ${
-              isAutoStreaming
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all border ${isAutoStreaming
                 ? 'bg-amber-950 text-amber-400 border-amber-800 animate-pulse'
                 : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
-            }`}
+              }`}
           >
             {isAutoStreaming ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             <span>{isAutoStreaming ? 'PAUSE AUTO-STREAM' : 'AUTO-STREAM TELEMETRY'}</span>
@@ -263,22 +262,20 @@ export const ThreatDetection: React.FC = () => {
                     <td className="py-3 px-3 text-slate-300">{evt.affectedAssetName || evt.affectedAssetId}</td>
                     <td className="py-3 px-3 font-mono text-slate-400">{evt.detectionSource}</td>
                     <td className="py-3 px-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        evt.severity === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                        evt.severity === 'HIGH' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                        evt.severity === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                        'bg-slate-500/20 text-slate-400 border border-slate-500/30'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${evt.severity === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                          evt.severity === 'HIGH' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                            evt.severity === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                              'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+                        }`}>
                         {evt.severity}
                       </span>
                     </td>
                     <td className="py-3 px-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                        evt.investigationStatus === 'NEW' ? 'bg-rose-500/10 text-rose-400' :
-                        evt.investigationStatus === 'INVESTIGATING' ? 'bg-amber-500/10 text-amber-400' :
-                        evt.investigationStatus === 'CONTAINED' ? 'bg-blue-500/10 text-blue-400' :
-                        'bg-emerald-500/10 text-emerald-400'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${evt.investigationStatus === 'NEW' ? 'bg-rose-500/10 text-rose-400' :
+                          evt.investigationStatus === 'INVESTIGATING' ? 'bg-amber-500/10 text-amber-400' :
+                            evt.investigationStatus === 'CONTAINED' ? 'bg-blue-500/10 text-blue-400' :
+                              'bg-emerald-500/10 text-emerald-400'
+                        }`}>
                         {evt.investigationStatus}
                       </span>
                     </td>
@@ -394,13 +391,12 @@ export const ThreatDetection: React.FC = () => {
               <div className="flex items-center space-x-3 shrink-0">
                 <span className="font-mono text-slate-500">{event.timestamp}</span>
                 <span
-                  className={`font-mono px-2 py-0.5 rounded font-bold border ${
-                    event.severity === 'CRITICAL'
+                  className={`font-mono px-2 py-0.5 rounded font-bold border ${event.severity === 'CRITICAL'
                       ? 'bg-rose-950 text-rose-400 border-rose-800'
                       : event.severity === 'HIGH'
-                      ? 'bg-amber-950 text-amber-400 border-amber-800'
-                      : 'bg-blue-950 text-blue-400 border-blue-800'
-                  }`}
+                        ? 'bg-amber-950 text-amber-400 border-amber-800'
+                        : 'bg-blue-950 text-blue-400 border-blue-800'
+                    }`}
                 >
                   {event.eventType}
                 </span>

@@ -21,7 +21,16 @@ import {
   Building2,
   Lock,
   ArrowUpRight,
-  Filter
+  Filter,
+  Layers,
+  Globe,
+  Activity,
+  Zap,
+  ArrowDown,
+  ArrowRight,
+  CheckCircle2,
+  Info,
+  X
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BankAsset } from '../types';
@@ -34,6 +43,8 @@ export const BankAssets: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'TOPOLOGY' | 'LIST'>('TOPOLOGY');
+  const [selectedTopologyAsset, setSelectedTopologyAsset] = useState<BankAsset | null>(null);
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -119,7 +130,6 @@ export const BankAssets: React.FC = () => {
 
     try {
       if (editingAsset) {
-        // Update existing asset
         const res = await fetch(`/api/bank-assets/${editingAsset.id}`, {
           method: 'PUT',
           headers: {
@@ -137,7 +147,6 @@ export const BankAssets: React.FC = () => {
           alert(`Error: ${errData.message || 'Failed to update asset'}`);
         }
       } else {
-        // Create new asset
         const res = await fetch('/api/bank-assets', {
           method: 'POST',
           headers: {
@@ -202,7 +211,7 @@ export const BankAssets: React.FC = () => {
     }
   };
 
-  // Filtered Assets
+  // Filtered Assets for Table
   const filteredAssets = useMemo(() => {
     return assets.filter((asset) => {
       const matchesSearch =
@@ -232,26 +241,68 @@ export const BankAssets: React.FC = () => {
     return ['ALL', ...Array.from(set)];
   }, [assets]);
 
+  // Enclave Groupings
+  const enclaves = useMemo(() => {
+    return [
+      {
+        id: 'zone-1',
+        title: 'Zone 1: Perimeter DMZ (External Customer Ingress)',
+        subtitle: 'Internet-facing endpoints protected by WAF rate-limiters & anti-DDoS proxies.',
+        ingressPolicy: 'Strict HTTPS (Port 443) via Cloudflare & Palo Alto NGFW',
+        securityLevel: 'Public DMZ',
+        assetIds: ['asset-netbank', 'asset-mobile'],
+        telemetry: { sessions: '1,420 Active', tps: '320 req/s', waf: 'Active' }
+      },
+      {
+        id: 'zone-2',
+        title: 'Zone 2: Payment Switch & NPCI Gateway',
+        subtitle: 'High-throughput financial clearing interfacing with NPCI NFS and UPI 2.0 settlement.',
+        ingressPolicy: 'Mutual TLS (mTLS) & Hardware Token PIN Block Routing',
+        securityLevel: 'PCI-DSS / RBI Payment Enclave',
+        assetIds: ['asset-payment', 'asset-atm'],
+        telemetry: { tps: '185 TPS', latency: '14 ms', npci: 'Synchronized' }
+      },
+      {
+        id: 'zone-3',
+        title: 'Zone 3: Private Core Banking Enclave (Zero Public Ingress)',
+        subtitle: 'Finacle CBS ledger, Thales Luna HSM cryptographic cluster, and Oracle RAC CIF database.',
+        ingressPolicy: 'Air-Gapped Subnet with DAM & Zero Public Direct Ingress',
+        securityLevel: 'Tier-1 Air-Gapped Internal',
+        assetIds: ['asset-cbs', 'asset-auth', 'asset-custdb'],
+        telemetry: { transactions: '2,450/sec', hsm: 'Hardware HSM Validated', db: 'RAC Active' }
+      },
+      {
+        id: 'zone-4',
+        title: 'Zone 4: Operations & Disaster Recovery (Hyderabad Off-Site)',
+        subtitle: 'Regional branch workstation fleets and synchronous DR site replication.',
+        ingressPolicy: 'IPsec SD-WAN VPN with WORM Immutable Storage',
+        securityLevel: 'Restricted Branch & BC/DR',
+        assetIds: ['asset-workstations', 'asset-network', 'asset-dr'],
+        telemetry: { branches: '24 Branches', drLag: '0.8s Sync Lag', storage: 'WORM Locked' }
+      }
+    ];
+  }, []);
+
   const getCategoryIcon = (category: string) => {
     switch (category.toLowerCase()) {
       case 'core banking':
-        return <Landmark className="w-4 h-4 text-cyan-400" />;
+        return <Landmark className="w-5 h-5 text-cyan-400" />;
       case 'payment gateway':
-        return <CreditCard className="w-4 h-4 text-purple-400" />;
+        return <CreditCard className="w-5 h-5 text-purple-400" />;
       case 'atm infrastructure':
-        return <Building2 className="w-4 h-4 text-amber-400" />;
+        return <Building2 className="w-5 h-5 text-amber-400" />;
       case 'mobile banking':
-        return <Smartphone className="w-4 h-4 text-emerald-400" />;
+        return <Smartphone className="w-5 h-5 text-emerald-400" />;
       case 'customer database':
-        return <Database className="w-4 h-4 text-rose-400" />;
+        return <Database className="w-5 h-5 text-rose-400" />;
       case 'workstations & endpoints':
-        return <Monitor className="w-4 h-4 text-blue-400" />;
+        return <Monitor className="w-5 h-5 text-blue-400" />;
       case 'authentication server':
-        return <Lock className="w-4 h-4 text-yellow-400" />;
+        return <Lock className="w-5 h-5 text-yellow-400" />;
       case 'internal network':
-        return <Network className="w-4 h-4 text-indigo-400" />;
+        return <Network className="w-5 h-5 text-indigo-400" />;
       default:
-        return <Server className="w-4 h-4 text-slate-400" />;
+        return <Server className="w-5 h-5 text-slate-400" />;
     }
   };
 
@@ -301,19 +352,45 @@ export const BankAssets: React.FC = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white tracking-wide flex items-center gap-2">
-                Demo Bank Asset Inventory
+                Demo Bank Asset & Enclave Topology
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-medium">
                   Banking Security Edition
                 </span>
               </h1>
               <p className="text-sm text-slate-400">
-                Monitored critical infrastructure, real-time security posture & vulnerability exposure for Demo Bank (org-1)
+                Monitored critical infrastructure, architectural enclave isolation & real-time telemetry for Demo Bank (org-1)
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {/* View Switcher: Enclave Topology vs List View */}
+          <div className="flex items-center bg-slate-900 border border-slate-700 p-1 rounded-xl">
+            <button
+              onClick={() => setViewMode('TOPOLOGY')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'TOPOLOGY'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Enclave Topology</span>
+            </button>
+            <button
+              onClick={() => setViewMode('LIST')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'LIST'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Server className="w-3.5 h-3.5" />
+              <span>Asset Inventory</span>
+            </button>
+          </div>
+
           <button
             onClick={fetchAssets}
             disabled={loading}
@@ -355,10 +432,10 @@ export const BankAssets: React.FC = () => {
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-white">{stats.total}</span>
-            <span className="text-xs text-slate-400">banking systems</span>
+            <span className="text-xs text-slate-400">across 4 Enclaves</span>
           </div>
           <div className="mt-2 text-xs text-cyan-400/80 flex items-center gap-1">
-            <span>100% telemetry coverage</span>
+            <span>Air-gapped CBS & HSM included</span>
           </div>
         </div>
 
@@ -386,7 +463,7 @@ export const BankAssets: React.FC = () => {
             <span className="text-xs text-slate-400">require mitigation</span>
           </div>
           <div className="mt-2 text-xs text-amber-400/80 flex items-center gap-1">
-            <span>Active containment in progress</span>
+            <span>Simulated velocity burst active</span>
           </div>
         </div>
 
@@ -400,172 +477,396 @@ export const BankAssets: React.FC = () => {
             <span className="text-xs text-slate-400">/ 100</span>
           </div>
           <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
-            <span>Weighted banking exposure</span>
+            <span>10-factor weighted exposure</span>
           </div>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="bg-[#0F1420]/80 border border-slate-800/80 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between shadow-lg">
-        <div className="relative w-full md:w-96">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by asset name, IP, department, or stack..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-900/90 border border-slate-700/80 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
-          />
-        </div>
+      {/* VIEW MODE 1: BANKING ENCLAVE TOPOLOGY DIAGRAM */}
+      {viewMode === 'TOPOLOGY' && (
+        <div className="space-y-6">
+          {/* UPI & ATM Switch Live Telemetry Sensor Strip */}
+          <div className="p-4 rounded-xl bg-slate-900/90 border border-cyan-500/30 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono shadow-xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                <Activity className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <span className="font-bold text-slate-200 uppercase tracking-wide">
+                  NPCI & UPI SWITCH TELEMETRY SENTRY
+                </span>
+                <p className="text-[11px] text-slate-400 font-sans">
+                  Real-time clearing switch throughput, fraud velocity monitor & HSM verification health.
+                </p>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-slate-400" />
-            <span className="text-xs text-slate-400 font-medium">Category:</span>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-            >
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">UPI 2.0 Clearing</span>
+                <span className="text-sm font-bold text-cyan-400 font-mono">185 TPS (Normal)</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">ATM NFS Switch</span>
+                <span className="text-sm font-bold text-emerald-400 font-mono">12 ms Latency</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800">
+                <span className="text-[10px] text-slate-500 block">Fraud Velocity State</span>
+                <span className={`text-sm font-bold font-mono ${
+                  assets.find((a) => a.id === 'asset-payment')?.securityStatus === 'COMPROMISED'
+                    ? 'text-rose-400 animate-pulse'
+                    : 'text-emerald-400'
+                }`}>
+                  {assets.find((a) => a.id === 'asset-payment')?.securityStatus === 'COMPROMISED'
+                    ? 'BURST (420/min)'
+                    : 'SAFE (12/min)'}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Status:</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="HEALTHY">Healthy</option>
-              <option value="DEGRADED">Degraded</option>
-              <option value="AT_RISK">At Risk</option>
-              <option value="COMPROMISED">Compromised</option>
-              <option value="MAINTENANCE">Maintenance</option>
-            </select>
-          </div>
-        </div>
-      </div>
+          {/* 4 Interactive Visual Enclaves */}
+          <div className="space-y-6">
+            {enclaves.map((zone, zIdx) => {
+              const zoneAssets = assets.filter((a) => zone.assetIds.includes(a.id));
+              const hasCompromised = zoneAssets.some((a) => a.securityStatus === 'COMPROMISED');
+              const hasAtRisk = zoneAssets.some((a) => a.securityStatus === 'AT_RISK');
 
-      {/* Asset Table */}
-      <div className="bg-[#0F1420]/80 border border-slate-800/80 rounded-xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider font-semibold">
-                <th className="py-3.5 px-4">Banking Asset</th>
-                <th className="py-3.5 px-4">Category</th>
-                <th className="py-3.5 px-4">Criticality</th>
-                <th className="py-3.5 px-4">IP / Endpoint</th>
-                <th className="py-3.5 px-4">Technology Stack</th>
-                <th className="py-3.5 px-4">Owner Dept</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Risk Score</th>
-                <th className="py-3.5 px-4">Vulns</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {filteredAssets.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
-                    <Server className="w-10 h-10 mx-auto mb-2 text-slate-600" />
-                    <p className="font-medium text-slate-300">No banking assets match your criteria</p>
-                    <p className="text-xs text-slate-500 mt-1">Try adjusting your search terms or filters</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredAssets.map((asset) => (
-                  <tr key={asset.id} className="hover:bg-slate-800/30 transition-colors group">
-                    <td className="py-4 px-4">
-                      <div>
-                        <div className="font-semibold text-slate-100 flex items-center gap-2">
-                          {asset.name}
-                        </div>
-                        <div className="text-xs text-slate-400 line-clamp-1 mt-0.5" title={asset.description}>
-                          {asset.description}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                        {getCategoryIcon(asset.category)}
-                        <span>{asset.category}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      {getCriticalityBadge(asset.criticality)}
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap font-mono text-xs text-cyan-400">
-                      {asset.ipOrIdentifier}
-                    </td>
-                    <td className="py-4 px-4 text-xs text-slate-300 max-w-[180px] truncate" title={asset.technologyStack}>
-                      {asset.technologyStack}
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-300">
-                      {asset.ownerDepartment}
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      {getStatusBadge(asset.securityStatus)}
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap">
+              return (
+                <div
+                  key={zone.id}
+                  className={`p-6 rounded-2xl border transition-all bg-gradient-to-r ${
+                    hasCompromised
+                      ? 'from-rose-950/30 via-slate-900 to-[#0F1420] border-rose-500/50 shadow-rose-950/40 shadow-xl'
+                      : hasAtRisk
+                      ? 'from-amber-950/20 via-slate-900 to-[#0F1420] border-amber-500/40'
+                      : 'from-[#0F1420] via-slate-900/90 to-[#0F1420] border-slate-800/80 shadow-lg'
+                  }`}
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800/80 pb-3 mb-4">
+                    <div>
                       <div className="flex items-center gap-2">
-                        <span className={`font-bold font-mono text-sm ${getRiskScoreColor(asset.riskScore)}`}>
-                          {asset.riskScore}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
+                          {zone.securityLevel}
                         </span>
-                        <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${
-                              asset.riskScore >= 80 ? 'bg-rose-500' :
-                              asset.riskScore >= 65 ? 'bg-amber-500' :
-                              asset.riskScore >= 45 ? 'bg-yellow-500' : 'bg-emerald-500'
-                            }`}
-                            style={{ width: `${asset.riskScore}%` }}
-                          />
-                        </div>
+                        <h3 className="text-base font-bold text-white tracking-wide">{zone.title}</h3>
                       </div>
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
-                        asset.associatedVulnsCount > 4 ? 'bg-rose-500/10 text-rose-400' :
-                        asset.associatedVulnsCount > 0 ? 'bg-amber-500/10 text-amber-400' :
-                        'bg-slate-800 text-slate-400'
-                      }`}>
-                        {asset.associatedVulnsCount} CVEs
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap text-right">
-                      {currentUser?.role === 'admin' && (
-                        <div className="flex items-center justify-end gap-1.5 opacity-90 group-hover:opacity-100">
-                          <button
-                            onClick={() => handleOpenEditModal(asset)}
-                            className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-cyan-400 transition-colors"
-                            title="Edit Asset"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAsset(asset.id, asset.name)}
-                            disabled={isDeleting === asset.id}
-                            className="p-1.5 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
-                            title="Delete Asset"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                      <p className="text-xs text-slate-400 mt-0.5">{zone.subtitle}</p>
+                    </div>
+
+                    <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
+                      <Lock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span className="text-slate-300">Policy: {zone.ingressPolicy}</span>
+                    </div>
+                  </div>
+
+                  {/* Asset Nodes in this Enclave */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {zoneAssets.map((asset) => {
+                      const isSelected = selectedTopologyAsset?.id === asset.id;
+                      return (
+                        <div
+                          key={asset.id}
+                          onClick={() => setSelectedTopologyAsset(asset)}
+                          className={`p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden group ${
+                            asset.securityStatus === 'COMPROMISED'
+                              ? 'bg-rose-950/40 border-rose-500 ring-2 ring-rose-500/30'
+                              : asset.securityStatus === 'AT_RISK'
+                              ? 'bg-amber-950/30 border-amber-500/60'
+                              : 'bg-slate-900/90 border-slate-800 hover:border-cyan-500/60'
+                          } ${isSelected ? 'ring-2 ring-cyan-400 border-cyan-400' : ''}`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 rounded-lg bg-slate-800/80 group-hover:scale-110 transition-transform">
+                                {getCategoryIcon(asset.category)}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">
+                                  {asset.name}
+                                </h4>
+                                <span className="text-[10px] font-mono text-cyan-400">{asset.ipOrIdentifier}</span>
+                              </div>
+                            </div>
+                            {getStatusBadge(asset.securityStatus)}
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 line-clamp-2 my-2">{asset.description}</p>
+
+                          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
+                            <span className="text-slate-400">{asset.technologyStack.split('/')[0]}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-500">Risk:</span>
+                              <strong className={getRiskScoreColor(asset.riskScore)}>{asset.riskScore}/100</strong>
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      );
+                    })}
+                  </div>
+
+                  {/* Inter-Zone Flow Indicator */}
+                  {zIdx < enclaves.length - 1 && (
+                    <div className="flex items-center justify-center pt-5 -mb-2">
+                      <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-[10px] font-mono text-slate-400">
+                        <ArrowDown className="w-3.5 h-3.5 text-cyan-400 animate-bounce" />
+                        <span>Filtered via Palo Alto NGFW & Mutual TLS Boundary</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* VIEW MODE 2: ASSET INVENTORY TABLE */}
+      {viewMode === 'LIST' && (
+        <div className="space-y-4">
+          {/* Filter and Search Bar */}
+          <div className="bg-[#0F1420]/80 border border-slate-800/80 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between shadow-lg">
+            <div className="relative w-full md:w-96">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by asset name, IP, department, or stack..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-900/90 border border-slate-700/80 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-400" />
+                <span className="text-xs text-slate-400 font-medium">Category:</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-medium">Status:</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="HEALTHY">Healthy</option>
+                  <option value="DEGRADED">Degraded</option>
+                  <option value="AT_RISK">At Risk</option>
+                  <option value="COMPROMISED">Compromised</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Asset Table */}
+          <div className="bg-[#0F1420]/80 border border-slate-800/80 rounded-xl overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider font-semibold">
+                    <th className="py-3.5 px-4">Banking Asset</th>
+                    <th className="py-3.5 px-4">Category</th>
+                    <th className="py-3.5 px-4">Criticality</th>
+                    <th className="py-3.5 px-4">IP / Endpoint</th>
+                    <th className="py-3.5 px-4">Technology Stack</th>
+                    <th className="py-3.5 px-4">Owner Dept</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4">Risk Score</th>
+                    <th className="py-3.5 px-4">Vulns</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredAssets.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-slate-400">
+                        <Server className="w-10 h-10 mx-auto mb-2 text-slate-600" />
+                        <p className="font-medium text-slate-300">No banking assets match your criteria</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAssets.map((asset) => (
+                      <tr key={asset.id} className="hover:bg-slate-800/30 transition-colors group">
+                        <td className="py-4 px-4">
+                          <div>
+                            <div className="font-semibold text-slate-100 flex items-center gap-2">
+                              {asset.name}
+                            </div>
+                            <div className="text-xs text-slate-400 line-clamp-1 mt-0.5" title={asset.description}>
+                              {asset.description}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                            {getCategoryIcon(asset.category)}
+                            <span>{asset.category}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          {getCriticalityBadge(asset.criticality)}
+                        </td>
+                        <td className="py-4 px-4 whitespace-nowrap font-mono text-xs text-cyan-400">
+                          {asset.ipOrIdentifier}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-slate-300 max-w-[180px] truncate" title={asset.technologyStack}>
+                          {asset.technologyStack}
+                        </td>
+                        <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-300">
+                          {asset.ownerDepartment}
+                        </td>
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          {getStatusBadge(asset.securityStatus)}
+                        </td>
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold font-mono text-sm ${getRiskScoreColor(asset.riskScore)}`}>
+                              {asset.riskScore}
+                            </span>
+                            <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${
+                                  asset.riskScore >= 80 ? 'bg-rose-500' :
+                                  asset.riskScore >= 65 ? 'bg-amber-500' :
+                                  asset.riskScore >= 45 ? 'bg-yellow-500' : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${asset.riskScore}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                            asset.associatedVulnsCount > 4 ? 'bg-rose-500/10 text-rose-400' :
+                            asset.associatedVulnsCount > 0 ? 'bg-amber-500/10 text-amber-400' :
+                            'bg-slate-800 text-slate-400'
+                          }`}>
+                            {asset.associatedVulnsCount} CVEs
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 whitespace-nowrap text-right">
+                          {currentUser?.role === 'admin' && (
+                            <div className="flex items-center justify-end gap-1.5 opacity-90 group-hover:opacity-100">
+                              <button
+                                onClick={() => handleOpenEditModal(asset)}
+                                className="p-1.5 rounded hover:bg-slate-700/60 text-slate-400 hover:text-cyan-400 transition-colors"
+                                title="Edit Asset"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteAsset(asset.id, asset.name)}
+                                disabled={isDeleting === asset.id}
+                                className="p-1.5 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                                title="Delete Asset"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Topology Asset Detail Drawer */}
+      {selectedTopologyAsset && (
+        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#0F1420] border-l border-cyan-500/30 shadow-2xl p-6 flex flex-col justify-between overflow-y-auto animate-fadeIn">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400">
+                  {getCategoryIcon(selectedTopologyAsset.category)}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">{selectedTopologyAsset.name}</h3>
+                  <span className="text-xs font-mono text-cyan-400">{selectedTopologyAsset.ipOrIdentifier}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedTopologyAsset(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs font-mono">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400">Security Posture</span>
+                {getStatusBadge(selectedTopologyAsset.securityStatus)}
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400">Criticality Tier</span>
+                {getCriticalityBadge(selectedTopologyAsset.criticality)}
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400">Cyber Risk Score</span>
+                <strong className={`text-sm ${getRiskScoreColor(selectedTopologyAsset.riskScore)}`}>
+                  {selectedTopologyAsset.riskScore} / 100
+                </strong>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
+                <span className="text-slate-500 block uppercase text-[10px]">Technology Stack</span>
+                <span className="text-slate-200">{selectedTopologyAsset.technologyStack}</span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
+                <span className="text-slate-500 block uppercase text-[10px]">Owner Department</span>
+                <span className="text-slate-200">{selectedTopologyAsset.ownerDepartment}</span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
+                <span className="text-slate-500 block uppercase text-[10px]">Operational Purpose</span>
+                <p className="text-slate-300 font-sans text-xs leading-relaxed">
+                  {selectedTopologyAsset.description}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-2">
+            {currentUser?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  handleOpenEditModal(selectedTopologyAsset);
+                  setSelectedTopologyAsset(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-cyan-500 text-slate-950 font-bold text-xs flex items-center gap-1.5"
+              >
+                <Edit2 className="w-3.5 h-3.5" /> Edit Configuration
+              </button>
+            )}
+            <button
+              onClick={() => setSelectedTopologyAsset(null)}
+              className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs"
+            >
+              Close Drawer
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Asset Modal */}
       {isModalOpen && (

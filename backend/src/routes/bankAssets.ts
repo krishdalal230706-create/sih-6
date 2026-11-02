@@ -280,3 +280,237 @@ bankAssetRouter.post('/reset-baseline', requireAuth, requireAdmin, (req: Authent
   const assets = endpointDb.getBankAssets(user.orgId).map(toBankAsset);
   return res.json({ success: true, assets, count: assets.length });
 });
+
+// GET /api/bank-assets/enclaves - Banking Security Enclave Architecture Topology
+bankAssetRouter.get('/enclaves', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const orgId = user.orgId || 'org-1';
+  const records = endpointDb.getBankAssets(orgId).map(toBankAsset);
+
+  // Group into 4 Real-World Banking Enclaves
+  const enclaves = [
+    {
+      id: 'enclave-dmz',
+      name: 'Zone 1: Perimeter DMZ',
+      description: 'External-facing customer portals with WAF rate-limiting and reverse proxy inspection.',
+      securityLevel: 'Public DMZ',
+      ingressPolicy: 'Strict HTTPS (Port 443) via Cloudflare & Palo Alto NGFW',
+      assets: records.filter((a) => ['asset-netbank', 'asset-mobile'].includes(a.id)),
+      telemetry: {
+        activeConnections: 1420,
+        requestsPerSec: 320,
+        blockedProbesPerMin: 85
+      }
+    },
+    {
+      id: 'enclave-payment',
+      name: 'Zone 2: Payment Switch & NPCI Gateway',
+      description: 'High-throughput clearing subnet interfacing with NPCI NFS and UPI 2.0 settlement.',
+      securityLevel: 'PCI-DSS / RBI Payment Enclave',
+      ingressPolicy: 'Mutual TLS (mTLS) & Hardware Token Authentication',
+      assets: records.filter((a) => ['asset-payment', 'asset-atm'].includes(a.id)),
+      telemetry: {
+        currentTps: 185,
+        avgLatencyMs: 14,
+        fraudVelocityStatus: records.find((a) => a.id === 'asset-payment')?.securityStatus === 'COMPROMISED' ? 'ALERT' : 'NORMAL'
+      }
+    },
+    {
+      id: 'enclave-core',
+      name: 'Zone 3: Private Core Banking Enclave',
+      description: 'Zero direct internet access. Finacle Core ledger, Thales Luna HSM, and Oracle RAC CIF.',
+      securityLevel: 'Tier-1 Air-Gapped Internal',
+      ingressPolicy: 'Internal Microsegmentation with DB Activity Monitoring',
+      assets: records.filter((a) => ['asset-cbs', 'asset-auth', 'asset-custdb'].includes(a.id)),
+      telemetry: {
+        activeLedgerTransactions: 2450,
+        hsmVerificationTps: 120,
+        integrityStatus: 'VERIFIED'
+      }
+    },
+    {
+      id: 'enclave-internal',
+      name: 'Zone 4: Operations & Disaster Recovery',
+      description: 'Regional branch workstation fleets and off-site Hyderabad synchronous DR replication.',
+      securityLevel: 'Restricted Branch & BC/DR',
+      ingressPolicy: 'IPsec SD-WAN VPN with Immutable Backup Storage',
+      assets: records.filter((a) => ['asset-workstations', 'asset-network', 'asset-dr'].includes(a.id)),
+      telemetry: {
+        branchEndpointsOnline: 24,
+        drReplicationLagSeconds: 0.8,
+        storageImmutability: 'WORM Locked'
+      }
+    }
+  ];
+
+  return res.json({ enclaves });
+});
+
+// POST /api/bank-assets/simulate-scenario - Live Demo Injection Bridge
+bankAssetRouter.post('/simulate-scenario', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const orgId = user.orgId || 'org-1';
+  const scenarioId = req.body.scenarioId || 'scenario-3';
+
+  interface ScenarioMapping {
+    assetId: string;
+    category: string;
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
+    description: string;
+    source: string;
+    action: string;
+    statusEffect: 'COMPROMISED' | 'AT_RISK';
+    riskDelta: number;
+  }
+
+  const mappings: Record<string, ScenarioMapping> = {
+    'scenario-1': {
+      assetId: 'asset-workstations',
+      category: 'Phishing & Account Takeover',
+      severity: 'HIGH',
+      description: 'Spear-phishing credential theft simulation: Teller workstation elevated session token replayed.',
+      source: 'Identity Threat Sentry',
+      action: 'Revoke active sessions and enforce FIDO2 hardware token verification.',
+      statusEffect: 'AT_RISK',
+      riskDelta: 22
+    },
+    'scenario-2': {
+      assetId: 'asset-netbank',
+      category: 'Credential Stuffing Burst',
+      severity: 'HIGH',
+      description: 'Distributed proxy botnet simulation: 1,840 failed customer logins / min targeting Internet Banking.',
+      source: 'WAF Rate Limiter',
+      action: 'Deploy immediate CAPTCHA challenge and IP CIDR velocity throttling.',
+      statusEffect: 'AT_RISK',
+      riskDelta: 25
+    },
+    'scenario-3': {
+      assetId: 'asset-payment',
+      category: 'UPI Gateway Micro-Debit Fraud',
+      severity: 'CRITICAL',
+      description: 'High-frequency micro-debit anomaly simulation: 420 micro-debits/min to suspect merchant VPA.',
+      source: 'UPI AI Sentry',
+      action: 'Apply instant settlement freeze and throttle suspect merchant endpoint.',
+      statusEffect: 'COMPROMISED',
+      riskDelta: 35
+    },
+    'scenario-4': {
+      assetId: 'asset-workstations',
+      category: 'Controlled Ransomware Canary Tripwire',
+      severity: 'CRITICAL',
+      description: 'Non-destructive ransomware canary file rename simulation on Branch Workstation subnet.',
+      source: 'Behavioral EDR Agent',
+      action: 'Host isolated from network; verify immutable snapshot rollback.',
+      statusEffect: 'COMPROMISED',
+      riskDelta: 30
+    },
+    'scenario-5': {
+      assetId: 'asset-custdb',
+      category: 'Insider Threat CIF Export',
+      severity: 'HIGH',
+      description: 'Off-hours bulk CIF record query simulation (10,000+ entries at 02:14 AM IST).',
+      source: 'Database Activity Monitor (DAM)',
+      action: 'Verify operational authorization and suspend unapproved query batches.',
+      statusEffect: 'AT_RISK',
+      riskDelta: 24
+    },
+    'scenario-6': {
+      assetId: 'asset-cbs',
+      category: 'Third-Party Dependency Vulnerability',
+      severity: 'HIGH',
+      description: 'Supply chain CVE alert simulation in embedded ISO 8583 banking library.',
+      source: 'SBOM Dependency Auditor',
+      action: 'Deploy WAF virtual patch signature to drop exploit attempts.',
+      statusEffect: 'AT_RISK',
+      riskDelta: 20
+    }
+  };
+
+  const map = mappings[scenarioId] || mappings['scenario-3'];
+  const asset = endpointDb.getBankAssetById(map.assetId);
+  if (!asset) {
+    return res.status(404).json({ error: 'ASSET_NOT_FOUND', message: 'Target asset does not exist.' });
+  }
+
+  // Update asset
+  const newRiskScore = Math.min(100, asset.risk_score + map.riskDelta);
+  endpointDb.updateBankAsset(asset.id, {
+    security_status: map.statusEffect,
+    risk_score: newRiskScore
+  });
+
+  // Inject Event
+  const eventId = `evt-sim-${crypto.randomBytes(3).toString('hex')}`;
+  const now = new Date().toISOString();
+  const eventRecord: BankSecurityEventRecord = {
+    id: eventId,
+    org_id: orgId,
+    affected_asset_id: asset.id,
+    event_category: map.category,
+    severity: map.severity,
+    timestamp: now,
+    description: map.description,
+    detection_source: map.source,
+    investigation_status: 'NEW',
+    recommended_action: map.action
+  };
+  endpointDb.saveBankSecurityEvent(eventRecord);
+
+  endpointDb.appendAudit(user.email, orgId, 'ATTACK_SIMULATION_INJECTED', `Injected ${scenarioId} (${map.category}) on ${asset.name}. Risk spiked +${map.riskDelta}.`);
+
+  return res.status(201).json({
+    success: true,
+    scenarioId,
+    event: toBankSecurityEvent({ ...eventRecord, affected_asset_name: asset.name }),
+    affectedAsset: toBankAsset(endpointDb.getBankAssetById(asset.id)!),
+    riskSpike: map.riskDelta
+  });
+});
+
+// POST /api/bank-assets/remediate-incident - Live Demo Containment & Rollback
+bankAssetRouter.post('/remediate-incident', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const orgId = user.orgId || 'org-1';
+  const { assetId, eventId } = req.body;
+
+  if (assetId) {
+    const asset = endpointDb.getBankAssetById(assetId);
+    if (asset) {
+      const baselineRisk = asset.criticality === 'CRITICAL' ? 25 : 30;
+      endpointDb.updateBankAsset(asset.id, {
+        security_status: 'HEALTHY',
+        risk_score: baselineRisk
+      });
+      endpointDb.appendAudit(user.email, orgId, 'ASSET_REMEDIATED', `Remediated ${asset.name}: status restored to HEALTHY (Risk: ${baselineRisk})`);
+    }
+  } else {
+    // Restore all banking assets to healthy baseline postures
+    const allAssets = endpointDb.getBankAssets(orgId);
+    for (const a of allAssets) {
+      if (a.security_status === 'COMPROMISED' || a.security_status === 'AT_RISK') {
+        endpointDb.updateBankAsset(a.id, {
+          security_status: 'HEALTHY',
+          risk_score: a.criticality === 'CRITICAL' ? 25 : 30
+        });
+      }
+    }
+  }
+
+  if (eventId) {
+    endpointDb.updateBankSecurityEventStatus(eventId, 'RESOLVED');
+  } else {
+    // Resolve recent events
+    const recent = endpointDb.getBankSecurityEvents(orgId, 10, { status: 'NEW' });
+    for (const r of recent) {
+      endpointDb.updateBankSecurityEventStatus(r.id, 'RESOLVED');
+    }
+  }
+
+  endpointDb.appendAudit(user.email, orgId, 'PLAYBOOK_EXECUTED', 'Demo Bank SOC Playbook executed. Risk posture returned to safe baseline.');
+
+  return res.json({
+    success: true,
+    message: 'Playbook successfully executed. Threat neutralized and asset restored to Healthy baseline.'
+  });
+});
+
