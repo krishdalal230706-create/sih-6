@@ -12,9 +12,8 @@
 4. [Tech Stack](#-tech-stack)
 5. [RBI CSITE & CERT-In Regulatory Compliance](#-rbi-csite--cert-in-regulatory-compliance)
 6. [Quick Start (Local Run)](#-quick-start-local-run)
-7. [60-Second Bank SOC Guided Pitch Tour](#-60-second-bank-soc-guided-pitch-tour)
-8. [Prototype vs. Real-World Production Readiness Analysis](#-prototype-vs-real-world-production-readiness-analysis)
-9. [Credentials & Demo Logins](#-credentials--demo-logins)
+7. [Prototype vs. Real-World Production Readiness Analysis](#-prototype-vs-real-world-production-readiness-analysis)
+8. [Credentials & Demo Logins](#-credentials--demo-logins)
 
 ---
 
@@ -56,7 +55,6 @@
 - **RBI CSITE Compliance Scorecard**: Continuous automated audit against 12 mandated RBI controls with 1-click gap remediation.
 - **Statutory 6-Hour CERT-In Advisory Exporter**: Formats official Indian Annexure 1 incident dispatch notices with forensic DLT hashes and CISO sign-off.
 - **6 Controlled Banking Attack Scenarios**: Non-destructive simulations of Spear-Phishing Account Takeover, Credential Stuffing on NetBanking, UPI Fraud Velocity Burst, Controlled Ransomware Canary, Insider CIF Query Anomaly, and Third-Party Dependency Flaws.
-- **Interactive 60-Second Guided Tour**: Presenter-ready 4-stage live demo mode built directly into the SOC header.
 
 ---
 
@@ -373,7 +371,6 @@ The platform is in the top tier of hackathon prototypes:
 - **Full-Stack Working Architecture**: React 18, TypeScript, Node.js Express, and persistent SQLite in WAL mode.
 - **107 Automated Test Suites**: 100% pass rate covering authentication, tenant isolation, banking risk calculation, fraud rules, and DLT hash-chaining.
 - **Regulatory Alignment**: Fully grounded in official Indian banking guidelines (RBI CSITE Framework & Section 70B(6) IT Act 2000 CERT-In 6-Hour reporting).
-- **Interactive Presenter Mode**: 4-stage guided pitch tour that demonstrates normal baseline, adversary attack injection, statutory advisory generation, and automated containment live within 60 seconds.
 
 ### 🏦 2. Real-World Production Deployment Checklist (Roadmap for Live Bank SOC)
 To deploy this software in a **real production Scheduled Commercial Bank** (such as SBI, HDFC, or ICICI), the following enterprise layers must be implemented:
