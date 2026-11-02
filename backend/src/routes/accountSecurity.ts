@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { endpointDb } from '../db/endpointDb.js';
+import { endpointDb, LoginAttemptRecord } from '../db/endpointDb.js';
 import { accountDetectionEngine } from '../engine/accountDetectionEngine.js';
 import { requireAuth, requireAdmin, requireDemoMode, AuthenticatedRequest } from '../middleware/authMiddleware.js';
 import { db } from '../models/db.js';
@@ -196,8 +196,20 @@ accountSecurityRouter.post('/fix', requireAuth, requireAdmin, async (req: Authen
       break;
 
     case 'block_ip_device':
-      const targetIp = entityValue || '198.51.100.42';
-      const targetDevice = 'Python-Requests/2.31';
+      let resolvedIp = entityValue;
+      let resolvedDevice = 'Python-Requests/2.31';
+      if (!resolvedIp) {
+        const attempts = endpointDb.getRecentLoginAttempts(user.email, 20);
+        const suspiciousAttempt = attempts.find((a: LoginAttemptRecord) => a.success === 0 || (Boolean(a.ip_address) && a.ip_address !== '127.0.0.1'));
+        if (suspiciousAttempt && suspiciousAttempt.ip_address) {
+          resolvedIp = suspiciousAttempt.ip_address;
+          if (suspiciousAttempt.device_fingerprint) {
+            resolvedDevice = suspiciousAttempt.device_fingerprint;
+          }
+        }
+      }
+      const targetIp = resolvedIp || '198.51.100.42';
+      const targetDevice = resolvedDevice;
       endpointDb.blockEntity(
         user.org_id,
         'IP',

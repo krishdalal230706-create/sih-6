@@ -55,6 +55,7 @@ export const AccountDetail: React.FC = () => {
     action: string;
     title: string;
     description: string;
+    entityValue?: string;
   } | null>(null);
 
   const fetchUserDetails = async () => {
@@ -77,7 +78,7 @@ export const AccountDetail: React.FC = () => {
     return () => clearInterval(interval);
   }, [userId]);
 
-  const handleExecuteFix = async (action: string) => {
+  const handleExecuteFix = async (action: string, entityValue?: string) => {
     if (!userId) return;
     setActionLoading(action);
     setConfirmModal(null);
@@ -86,7 +87,8 @@ export const AccountDetail: React.FC = () => {
       const data = await api.post<any>('/api/account-security/fix', {
         userId,
         action,
-        alertId: userData?.alert?.id
+        alertId: userData?.alert?.id,
+        entityValue: entityValue
       });
 
       setActionLoading(null);
@@ -181,6 +183,12 @@ export const AccountDetail: React.FC = () => {
   const isLocked = user.status === 'locked';
   const isResetRequired = user.status === 'reset_required' || user.mustReset;
   const riskScore = alert && alert.status !== 'Remediated' ? alert.accountRiskScore : isLocked ? 45 : 18;
+
+  // Dynamically resolve adversary IP, device fingerprint, and location from sign-in timeline
+  const suspiciousAttempt = recentSignIns?.find((att) => att.success === 0 || (att.ip_address && att.ip_address !== '127.0.0.1')) || recentSignIns?.[0];
+  const detectedAttackerIp = suspiciousAttempt?.ip_address || '198.51.100.42';
+  const detectedAttackerDevice = suspiciousAttempt?.device_fingerprint || 'Python-Requests/2.31 (Adversary Script)';
+  const detectedLocation = suspiciousAttempt?.location || 'Offshore Remote Host';
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -469,7 +477,8 @@ export const AccountDetail: React.FC = () => {
                   isOpen: true,
                   action: 'block_ip_device',
                   title: 'Block Adversary IP & Device Fingerprint',
-                  description: `Add attacker IP address (198.51.100.42) and automation fingerprint to institutional blocklist.`
+                  description: `Quarantine hostile source IP (${detectedAttackerIp}${detectedLocation ? ` • ${detectedLocation}` : ''}) and client fingerprint (${detectedAttackerDevice}) on the institutional perimeter firewall. All connection requests from this origin will be dropped immediately.`,
+                  entityValue: detectedAttackerIp
                 })
               }
               disabled={Boolean(actionLoading)}
@@ -631,6 +640,34 @@ export const AccountDetail: React.FC = () => {
 
             <p className="text-xs text-slate-300 leading-relaxed font-sans">{confirmModal.description}</p>
 
+            {/* Dynamic Threat Origin Telemetry for IP / Device blocking */}
+            {confirmModal.action === 'block_ip_device' && (
+              <div className="bg-[#0B0F17] p-3 rounded-xl border border-rose-900/50 space-y-2 text-xs font-mono">
+                <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider flex items-center space-x-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Threat Origin Telemetry (Resolved from Timeline)</span>
+                </div>
+                <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">Target Adversary IP:</span>
+                    <span className="text-rose-300 font-bold text-[11px] bg-rose-950/70 border border-rose-800/60 px-2 py-0.5 rounded">
+                      {confirmModal.entityValue || detectedAttackerIp}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">Origin Geolocation:</span>
+                    <span className="text-slate-200 text-[11px]">{detectedLocation}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">Automation Client:</span>
+                    <span className="text-slate-300 text-[11px] truncate max-w-[190px]" title={detectedAttackerDevice}>
+                      {detectedAttackerDevice}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
               <button
                 type="button"
@@ -642,7 +679,7 @@ export const AccountDetail: React.FC = () => {
               <button
                 type="button"
                 disabled={Boolean(actionLoading)}
-                onClick={() => handleExecuteFix(confirmModal.action)}
+                onClick={() => handleExecuteFix(confirmModal.action, confirmModal.entityValue)}
                 className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-semibold text-xs rounded-lg shadow-lg shadow-cyan-500/20 flex items-center space-x-2"
               >
                 <span>{actionLoading ? 'Executing...' : 'Confirm Remote Fix'}</span>
