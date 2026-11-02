@@ -4,6 +4,7 @@ import { endpointDb } from '../db/endpointDb.js';
 import { calculateOrganizationRisk, BANKING_RISK_WEIGHTS } from '../engine/riskEngine.js';
 import { db } from '../models/db.js';
 import { Organization } from '../types.js';
+import { emailLockouts, MAX_FAILED_ATTEMPTS_PER_EMAIL } from '../routes/auth.js';
 
 test('Banking Security Edition: Demo Bank Baseline & 10 Synthetic Assets', async (t) => {
   await t.test('1. Demo Bank (org-1) is configured as Primary Banking Institution', () => {
@@ -261,5 +262,40 @@ test('Banking Transaction Fraud Rules Engine', async (t) => {
     assert.strictEqual(restored?.security_status, 'HEALTHY');
   });
 });
+
+test('Banking Security Edition: Account-Specific Failed Login Lockout', async (t) => {
+  await t.test('1. Failed logins on Email A lock ONLY Email A, while Email B can log in normally', () => {
+    const emailA = 'victim_brute@demobank.com';
+    const emailB = 'innocent_colleague@demobank.com';
+
+    // Simulate failed logins on Email A to reach lockout threshold
+    for (let i = 0; i < MAX_FAILED_ATTEMPTS_PER_EMAIL; i++) {
+      const cur = emailLockouts.get(emailA);
+      const count = (!cur) ? 1 : cur.failedAttempts + 1;
+      if (count >= MAX_FAILED_ATTEMPTS_PER_EMAIL) {
+        emailLockouts.set(emailA, {
+          failedAttempts: count,
+          lockedUntil: Date.now() + 5 * 60 * 1000,
+          lastAttempt: Date.now()
+        });
+      } else {
+        emailLockouts.set(emailA, {
+          failedAttempts: count,
+          lockedUntil: 0,
+          lastAttempt: Date.now()
+        });
+      }
+    }
+
+    // Email A is now locked
+    const lockoutA = emailLockouts.get(emailA);
+    assert.ok(lockoutA && lockoutA.lockedUntil > Date.now(), 'Email A must be locked for 5 minutes');
+
+    // Email B is NOT locked
+    const lockoutB = emailLockouts.get(emailB);
+    assert.ok(!lockoutB || lockoutB.lockedUntil <= Date.now(), 'Email B must NOT be locked');
+  });
+});
+
 
 

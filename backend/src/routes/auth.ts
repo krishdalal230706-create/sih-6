@@ -14,6 +14,25 @@ import { Organization } from '../types.js';
 
 export const authRouter = Router();
 
+// Per-email failed login tracking for account-specific 5-minute lockout
+interface EmailLockoutRecord {
+  failedAttempts: number;
+  lockedUntil: number;
+  lastAttempt: number;
+}
+
+export const emailLockouts = new Map<string, EmailLockoutRecord>();
+export const MAX_FAILED_ATTEMPTS_PER_EMAIL = 6;
+export const EMAIL_LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes cooldown
+
+export function clearEmailLockout(email?: string) {
+  if (email) {
+    emailLockouts.delete(email.trim().toLowerCase());
+  } else {
+    emailLockouts.clear();
+  }
+}
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -81,7 +100,7 @@ function getClientDevice(req: Request): string {
 }
 
 // Login Endpoint
-authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
+authRouter.post('/login', async (req: Request, res: Response) => {
   const parseResult = loginSchema.safeParse(req.body);
   if (!parseResult.success) {
     return res.status(400).json({
@@ -95,6 +114,41 @@ authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
   const deviceFingerprint = parseResult.data.deviceFingerprint || getClientDevice(req);
   const location = parseResult.data.location || 'New York, US';
   const now = new Date().toISOString();
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const nowMs = Date.now();
+
+  // 0. Account-Specific Lockout Check (Only block this specific email for 5 mins, allow all other accounts)
+  const emailLockout = emailLockouts.get(normalizedEmail);
+  if (emailLockout && nowMs < emailLockout.lockedUntil) {
+    const remainingSeconds = Math.ceil((emailLockout.lockedUntil - nowMs) / 1000);
+    const remainingMinutes = Math.max(1, Math.ceil(remainingSeconds / 60));
+    return res.status(429).json({
+      error: 'TOO_MANY_FAILED_LOGINS',
+      message: `Too many authentication attempts for this account. Please try again after ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}.`,
+      retryAfterSeconds: remainingSeconds
+    });
+  }
+
+  const recordAccountFailedAttempt = () => {
+    const cur = emailLockouts.get(normalizedEmail);
+    const isStale = cur && (nowMs - cur.lastAttempt > EMAIL_LOCKOUT_DURATION_MS);
+    const count = (!cur || isStale) ? 1 : cur.failedAttempts + 1;
+
+    if (count >= MAX_FAILED_ATTEMPTS_PER_EMAIL) {
+      emailLockouts.set(normalizedEmail, {
+        failedAttempts: count,
+        lockedUntil: nowMs + EMAIL_LOCKOUT_DURATION_MS,
+        lastAttempt: nowMs
+      });
+    } else {
+      emailLockouts.set(normalizedEmail, {
+        failedAttempts: count,
+        lockedUntil: 0,
+        lastAttempt: nowMs
+      });
+    }
+  };
 
   const user = endpointDb.getUserByEmail(email);
   const orgId = user ? user.org_id : 'org-1';
@@ -140,6 +194,7 @@ authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
     });
 
     endpointDb.appendAudit(email, 'unknown', 'LOGIN_FAILED', `Failed login attempt for nonexistent user ${email} from ${ipAddress}`);
+    recordAccountFailedAttempt();
     return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' });
   }
 
@@ -209,10 +264,12 @@ authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
     accountDetectionEngine.processLoginAttempt(failedAttempt);
 
     endpointDb.appendAudit(email, user.org_id, 'LOGIN_FAILED', `Failed login attempt with incorrect password for ${email} from ${ipAddress}`);
+    recordAccountFailedAttempt();
     return res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' });
   }
 
   // 5. Successful login
+  emailLockouts.delete(normalizedEmail);
   const attemptId = `att-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
   const successAttempt: LoginAttemptRecord = {
     id: attemptId,

@@ -9,6 +9,7 @@ import { wsHub } from '../ws/wsHub.js';
 import { sanitizeAccountAlertToPattern } from '../engine/privacyEngine.js';
 import { addLedgerBlock, verifyLedgerChain } from '../engine/dltLedger.js';
 import { correlateThreatPatterns } from '../engine/correlationEngine.js';
+import { clearEmailLockout } from './auth.js';
 
 export const accountSecurityRouter = Router();
 
@@ -239,6 +240,7 @@ accountSecurityRouter.post('/fix', requireAuth, requireAdmin, async (req: Authen
 
     case 'unlock_restore':
       endpointDb.updateUserStatus(user.id, 'active');
+      clearEmailLockout(user.email);
       endpointDb.addAccountNotice(
         user.id,
         user.org_id,
