@@ -40,7 +40,9 @@ class LedgerDatabase {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    this.dbPath = path.join(dataDir, 'cyberguard_vulnerabilities.db');
+    const isTestEnv = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
+    const dbFileName = isTestEnv ? 'cyberguard_test.db' : 'cyberguard_vulnerabilities.db';
+    this.dbPath = process.env.CYBERGUARD_DB_PATH || path.join(dataDir, dbFileName);
     this.init();
   }
 

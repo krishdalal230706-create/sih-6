@@ -217,7 +217,9 @@ export class EndpointDatabase {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    this.dbPath = path.join(dataDir, 'cyberguard_vulnerabilities.db');
+    const isTestEnv = process.env.NODE_ENV === 'test' || process.argv.some((arg) => arg.includes('test'));
+    const dbFileName = isTestEnv ? 'cyberguard_test.db' : 'cyberguard_vulnerabilities.db';
+    this.dbPath = process.env.CYBERGUARD_DB_PATH || path.join(dataDir, dbFileName);
     this.db = new Database(this.dbPath);
     this.db.pragma('journal_mode = WAL');
     this.initTables();
@@ -457,39 +459,45 @@ export class EndpointDatabase {
       insertOrg.run({ id: 'org-3', name: 'University C', type: 'Education & Research', join_code: 'UNIV-C03', requires_approval: 0, opted_in_collaborative: 1, created_at: now });
     }
 
-    const userCount = this.db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-    if (userCount.count > 0) return;
+    const userCount = (this.db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
+    if (userCount === 0) {
+      console.log('🌱 [EndpointDb] Seeding prototype users...');
+      const now = new Date().toISOString();
+      const adminPassHash = bcrypt.hashSync('AdminPass123!', 10);
+      const userPassHash = bcrypt.hashSync('UserPass123!', 10);
 
-    console.log('🌱 [EndpointDb] Seeding prototype users, devices, and initial audit record...');
-    const now = new Date().toISOString();
-    const adminPassHash = bcrypt.hashSync('AdminPass123!', 10);
-    const userPassHash = bcrypt.hashSync('UserPass123!', 10);
+      const usersToInsert: UserRecord[] = [
+        // Bank A (org-1)
+        { id: 'usr-bank-admin', org_id: 'org-1', name: 'Bank A Admin', email: 'admin@banka.com', password_hash: adminPassHash, role: 'admin', status: 'active', mfa_required: 0, privilege_level: 'ADMIN', must_reset: 0, created_at: now },
+        { id: 'usr-bank-portal-test', org_id: 'org-1', name: 'Portal Test User', email: 'user_portal_test@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
+        { id: 'usr-bank-alice', org_id: 'org-1', name: 'Alice Walker', email: 'alice@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
+        { id: 'usr-bank-bob', org_id: 'org-1', name: 'Bob Miller', email: 'bob@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'ELEVATED', must_reset: 0, created_at: now },
 
-    const usersToInsert: UserRecord[] = [
-      // Bank A (org-1)
-      { id: 'usr-bank-admin', org_id: 'org-1', name: 'Bank A Admin', email: 'admin@banka.com', password_hash: adminPassHash, role: 'admin', status: 'active', mfa_required: 0, privilege_level: 'ADMIN', must_reset: 0, created_at: now },
-      { id: 'usr-bank-alice', org_id: 'org-1', name: 'Alice Walker', email: 'alice@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
-      { id: 'usr-bank-bob', org_id: 'org-1', name: 'Bob Miller', email: 'bob@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'ELEVATED', must_reset: 0, created_at: now },
+        // Hospital B (org-2)
+        { id: 'usr-hosp-admin', org_id: 'org-2', name: 'Hospital B Admin', email: 'admin@hospitalb.org', password_hash: adminPassHash, role: 'admin', status: 'active', mfa_required: 0, privilege_level: 'ADMIN', must_reset: 0, created_at: now },
+        { id: 'usr-hosp-clara', org_id: 'org-2', name: 'Dr. Clara Oswald', email: 'clara@hospitalb.org', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
+        { id: 'usr-hosp-david', org_id: 'org-2', name: 'David Kim', email: 'david@hospitalb.org', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
 
-      // Hospital B (org-2)
-      { id: 'usr-hosp-admin', org_id: 'org-2', name: 'Hospital B Admin', email: 'admin@hospitalb.org', password_hash: adminPassHash, role: 'admin', status: 'active', mfa_required: 0, privilege_level: 'ADMIN', must_reset: 0, created_at: now },
-      { id: 'usr-hosp-clara', org_id: 'org-2', name: 'Dr. Clara Oswald', email: 'clara@hospitalb.org', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
-      { id: 'usr-hosp-david', org_id: 'org-2', name: 'David Kim', email: 'david@hospitalb.org', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
+        // University C (org-3)
+        { id: 'usr-univ-admin', org_id: 'org-3', name: 'Univ C Admin', email: 'admin@univc.edu', password_hash: adminPassHash, role: 'admin', status: 'active', mfa_required: 0, privilege_level: 'ADMIN', must_reset: 0, created_at: now },
+        { id: 'usr-univ-emma', org_id: 'org-3', name: 'Prof. Emma Watson', email: 'emma@univc.edu', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
+        { id: 'usr-univ-frank', org_id: 'org-3', name: 'Frank Underhill', email: 'frank@univc.edu', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
+      ];
 
-      // University C (org-3)
-      { id: 'usr-univ-admin', org_id: 'org-3', name: 'Univ C Admin', email: 'admin@univc.edu', password_hash: adminPassHash, role: 'admin', status: 'active', mfa_required: 0, privilege_level: 'ADMIN', must_reset: 0, created_at: now },
-      { id: 'usr-univ-emma', org_id: 'org-3', name: 'Prof. Emma Watson', email: 'emma@univc.edu', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
-      { id: 'usr-univ-frank', org_id: 'org-3', name: 'Frank Underhill', email: 'frank@univc.edu', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
-    ];
+      const insertUser = this.db.prepare(`
+        INSERT OR REPLACE INTO users (id, org_id, name, email, password_hash, role, status, mfa_required, privilege_level, must_reset, created_at)
+        VALUES (@id, @org_id, @name, @email, @password_hash, @role, @status, @mfa_required, @privilege_level, @must_reset, @created_at)
+      `);
 
-    const insertUser = this.db.prepare(`
-      INSERT OR REPLACE INTO users (id, org_id, name, email, password_hash, role, status, mfa_required, privilege_level, must_reset, created_at)
-      VALUES (@id, @org_id, @name, @email, @password_hash, @role, @status, @mfa_required, @privilege_level, @must_reset, @created_at)
-    `);
-
-    for (const u of usersToInsert) {
-      insertUser.run(u);
+      for (const u of usersToInsert) {
+        insertUser.run(u);
+      }
     }
+
+    const deviceCount = (this.db.prepare('SELECT COUNT(*) as count FROM devices').get() as { count: number }).count;
+    if (deviceCount === 0) {
+      console.log('💻 [EndpointDb] Seeding prototype devices...');
+      const now = new Date().toISOString();
 
     const devicesToInsert: Array<DeviceRecord & { command_secret: string; token: string }> = [
       {
@@ -598,8 +606,12 @@ export class EndpointDatabase {
       const tokenHash = crypto.createHash('sha256').update(d.token).digest('hex');
       insertSecret.run(d.id, tokenHash, d.command_secret);
     }
+  }
 
+  const auditCount = (this.db.prepare('SELECT COUNT(*) as count FROM audit_log').get() as { count: number }).count;
+  if (auditCount === 0) {
     // Genesis audit record
+    const now = new Date().toISOString();
     const genesisPrevHash = '0000000000000000000000000000000000000000000000000000000000000000';
     const auditId = 'aud-genesis-001';
     const auditTs = now;
@@ -614,6 +626,7 @@ export class EndpointDatabase {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(auditId, auditTs, actor, orgId, null, action, details, genesisPrevHash, hash);
   }
+}
 
   // Organization Operations
   public getOrgById(id: string): OrganizationRecord | undefined {
@@ -1119,6 +1132,90 @@ export class EndpointDatabase {
       `).run('usr-bank-soc-admin', 'org-1', 'Bank SOC Administrator', 'admin@demobank.com', adminPassHash, 'admin', 'active', 0, 'ADMIN', 0, new Date().toISOString());
     }
 
+    // Seed Portal Test User if missing (ensures employee portal user is always available without manual re-registration)
+    const existingPortalUser = this.db.prepare('SELECT id FROM users WHERE email = ?').get('user_portal_test@banka.com');
+    if (!existingPortalUser) {
+      const userPassHash = bcrypt.hashSync('UserPass123!', 10);
+      this.db.prepare(`
+        INSERT OR REPLACE INTO users (id, org_id, name, email, password_hash, role, status, mfa_required, privilege_level, must_reset, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run('usr-bank-portal-test', 'org-1', 'Portal Test User', 'user_portal_test@banka.com', userPassHash, 'user', 'active', 0, 'STANDARD', 0, new Date().toISOString());
+    }
+
+    // Seed Baseline Login Attempts if empty
+    const loginCount = (this.db.prepare('SELECT COUNT(*) as count FROM login_attempts').get() as { count: number }).count;
+    if (loginCount === 0) {
+      const insertLogin = this.db.prepare(`
+        INSERT OR REPLACE INTO login_attempts (id, user_id, email, org_id, success, ip_address, device_fingerprint, location, failure_reason, timestamp)
+        VALUES (@id, @user_id, @email, @org_id, @success, @ip_address, @device_fingerprint, @location, @failure_reason, @timestamp)
+      `);
+      const sampleAttempts: LoginAttemptRecord[] = [
+        {
+          id: 'att-init-portal-1',
+          user_id: 'usr-bank-portal-test',
+          email: 'user_portal_test@banka.com',
+          org_id: 'org-1',
+          success: 1,
+          ip_address: '127.0.0.1',
+          device_fingerprint: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
+          location: 'New York, US',
+          failure_reason: null,
+          timestamp: new Date(Date.now() - 3600000).toISOString()
+        },
+        {
+          id: 'att-init-portal-2',
+          user_id: 'usr-bank-portal-test',
+          email: 'user_portal_test@banka.com',
+          org_id: 'org-1',
+          success: 1,
+          ip_address: '10.10.4.15',
+          device_fingerprint: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/128.0',
+          location: 'New York, US',
+          failure_reason: null,
+          timestamp: new Date(Date.now() - 86400000).toISOString()
+        },
+        {
+          id: 'att-init-alice-1',
+          user_id: 'usr-bank-alice',
+          email: 'alice@banka.com',
+          org_id: 'org-1',
+          success: 1,
+          ip_address: '10.10.4.22',
+          device_fingerprint: 'ALICE-LAPTOP-W11 / Windows 11 Enterprise',
+          location: 'New York, US',
+          failure_reason: null,
+          timestamp: new Date(Date.now() - 7200000).toISOString()
+        },
+        {
+          id: 'att-init-bob-1',
+          user_id: 'usr-bank-bob',
+          email: 'bob@banka.com',
+          org_id: 'org-1',
+          success: 1,
+          ip_address: '10.10.4.30',
+          device_fingerprint: 'BOB-FIN-WS02 / Windows 11 Pro',
+          location: 'New York, US',
+          failure_reason: null,
+          timestamp: new Date(Date.now() - 14400000).toISOString()
+        },
+        {
+          id: 'att-init-admin-1',
+          user_id: 'usr-bank-admin',
+          email: 'admin@banka.com',
+          org_id: 'org-1',
+          success: 1,
+          ip_address: '127.0.0.1',
+          device_fingerprint: 'SOC-CONSOLE-W11 / Chrome 128.0',
+          location: 'New York, US',
+          failure_reason: null,
+          timestamp: new Date(Date.now() - 1800000).toISOString()
+        }
+      ];
+      for (const att of sampleAttempts) {
+        insertLogin.run(att);
+      }
+    }
+
     // Seed Banking Assets if empty
     const assetCount = (this.db.prepare('SELECT COUNT(*) as count FROM bank_assets').get() as { count: number }).count;
     if (assetCount === 0) {
@@ -1490,13 +1587,23 @@ export class EndpointDatabase {
       DELETE FROM audit_log;
       DELETE FROM device_secrets;
       DELETE FROM devices;
-      DELETE FROM login_attempts;
       DELETE FROM blocked_entities;
       DELETE FROM account_notices;
       DELETE FROM account_alerts;
-      DELETE FROM users;
+      DELETE FROM login_attempts WHERE success = 0;
     `);
     this.seedDefaultsIfEmpty();
+    this.seedBankingDataIfEmpty();
+    try {
+      const adminPassHash = bcrypt.hashSync('AdminPass123!', 10);
+      const userPassHash = bcrypt.hashSync('UserPass123!', 10);
+      this.db.prepare("UPDATE users SET password_hash = ? WHERE role = 'admin' AND id LIKE 'usr-%'").run(adminPassHash);
+      this.db.prepare("UPDATE users SET password_hash = ? WHERE role = 'user' AND id LIKE 'usr-%'").run(userPassHash);
+      this.db.prepare("UPDATE users SET status = 'active', must_reset = 0, mfa_required = 0 WHERE id LIKE 'usr-%'").run();
+      this.db.prepare("UPDATE users SET privilege_level = 'STANDARD' WHERE id IN ('usr-bank-alice', 'usr-bank-portal-test', 'usr-hosp-clara', 'usr-hosp-david', 'usr-univ-emma', 'usr-univ-frank')").run();
+      this.db.prepare("UPDATE users SET privilege_level = 'ELEVATED' WHERE id = 'usr-bank-bob'").run();
+      this.db.prepare("UPDATE users SET privilege_level = 'ADMIN' WHERE role = 'admin'").run();
+    } catch {}
   }
 }
 

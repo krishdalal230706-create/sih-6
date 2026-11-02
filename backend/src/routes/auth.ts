@@ -912,6 +912,7 @@ authRouter.get('/demo-users', requireDemoMode, (req: Request, res: Response) => 
     notice: 'Prototype accounts for evaluation only. Credentials must be entered securely.',
     accounts: [
       { org: 'Bank A (org-1)', role: 'admin', email: 'admin@banka.com', label: 'Bank A SOC Admin' },
+      { org: 'Bank A (org-1)', role: 'user', email: 'user_portal_test@banka.com', label: 'Portal Test User (User)' },
       { org: 'Bank A (org-1)', role: 'user', email: 'alice@banka.com', label: 'Alice Walker (User)' },
       { org: 'Bank A (org-1)', role: 'user', email: 'bob@banka.com', label: 'Bob Miller (Elevated User)' },
       { org: 'Hospital B (org-2)', role: 'admin', email: 'admin@hospitalb.org', label: 'Hospital B SOC Admin' },
