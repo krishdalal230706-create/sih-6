@@ -414,7 +414,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let isCancelled = false;
 
     const connectWs = () => {
-      const wsUrlBase = (import.meta as any).env?.VITE_WS_URL || 'ws://localhost:5000';
+      const defaultWsHost = typeof window !== 'undefined' ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:5000` : 'ws://localhost:5000';
+      const wsUrlBase = (import.meta as any).env?.VITE_WS_URL || defaultWsHost;
       const wsUrl = `${wsUrlBase}/ws/admin?token=${encodeURIComponent(token)}`;
 
       try {

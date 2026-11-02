@@ -52,8 +52,14 @@ app.use(
       if (configuredOrigins.includes('*') || configuredOrigins.includes(origin)) {
         return callback(null, true);
       }
-      // Allow localhost in non-production
-      if (process.env.NODE_ENV !== 'production' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+      // Allow localhost and private local network (LAN) in non-production / demo
+      if (process.env.NODE_ENV !== 'production' && (
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1') ||
+        origin.includes('192.168.') ||
+        origin.includes('10.') ||
+        origin.includes('172.')
+      )) {
         return callback(null, true);
       }
       return callback(new Error(`CORS error: Origin ${origin} not permitted.`));

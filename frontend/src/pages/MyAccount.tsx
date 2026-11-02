@@ -185,7 +185,8 @@ export const MyAccount: React.FC = () => {
     let isCancelled = false;
 
     const connectUserWs = () => {
-      const wsUrlBase = (import.meta as any).env?.VITE_WS_URL || 'ws://localhost:5000';
+      const defaultWsHost = typeof window !== 'undefined' ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:5000` : 'ws://localhost:5000';
+      const wsUrlBase = (import.meta as any).env?.VITE_WS_URL || defaultWsHost;
       const wsUrl = `${wsUrlBase}/ws/user?token=${encodeURIComponent(token)}`;
 
       try {
