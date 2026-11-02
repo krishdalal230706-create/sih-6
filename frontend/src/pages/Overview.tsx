@@ -57,7 +57,8 @@ export const Overview: React.FC = () => {
     responseActions,
     vulnerabilityStats,
     token,
-    incidents
+    incidents,
+    switchOrg
   } = useApp();
   const navigate = useNavigate();
 
@@ -67,34 +68,127 @@ export const Overview: React.FC = () => {
   const [securityEvents, setSecurityEvents] = useState<BankSecurityEvent[]>([]);
   const [loadingAssets, setLoadingAssets] = useState<boolean>(true);
 
-  // Fetch Bank Assets and Bank Security Events from Backend
-  useEffect(() => {
+  // Fraud rules & Demo tour state
+  const [fraudRules, setFraudRules] = useState<any[]>([]);
+  const [simulatingFraud, setSimulatingFraud] = useState(false);
+  const [fraudSimMsg, setFraudSimMsg] = useState<string | null>(null);
+
+  // 60-Second Guided Pitch Tour
+  const [showDemoTour, setShowDemoTour] = useState(false);
+  const [demoTourStep, setDemoTourStep] = useState<1 | 2 | 3 | 4>(1);
+  const [demoInjecting, setDemoInjecting] = useState(false);
+  const [demoRemediating, setDemoRemediating] = useState(false);
+  const [demoFeedback, setDemoFeedback] = useState<string | null>(null);
+
+  // Fetch Bank Assets, Security Events, and Fraud Rules
+  const fetchBankData = async () => {
     if (!token) return;
-    const fetchBankData = async () => {
-      try {
-        setLoadingAssets(true);
-        const [assetsRes, eventsRes] = await Promise.all([
-          fetch('/api/bank-assets', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/bank-assets/events?limit=8', { headers: { Authorization: `Bearer ${token}` } })
-        ]);
+    try {
+      setLoadingAssets(true);
+      const [assetsRes, eventsRes, rulesRes] = await Promise.all([
+        fetch('/api/bank-assets', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/bank-assets/events?limit=8', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/bank-assets/fraud-rules', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
 
-        if (assetsRes.ok) {
-          const data = await assetsRes.json();
-          setBankAssets(data.assets || []);
-        }
-        if (eventsRes.ok) {
-          const eData = await eventsRes.json();
-          setSecurityEvents(eData.events || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch Bank SOC telemetry:', err);
-      } finally {
-        setLoadingAssets(false);
+      if (assetsRes.ok) {
+        const data = await assetsRes.json();
+        setBankAssets(data.assets || []);
       }
-    };
+      if (eventsRes.ok) {
+        const eData = await eventsRes.json();
+        setSecurityEvents(eData.events || []);
+      }
+      if (rulesRes.ok) {
+        const rData = await rulesRes.json();
+        setFraudRules(rData.rules || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch Bank SOC telemetry:', err);
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
 
+  useEffect(() => {
     fetchBankData();
   }, [token]);
+
+  // Simulate UPI Fraud burst
+  const handleSimulateFraud = async () => {
+    if (!token) return;
+    try {
+      setSimulatingFraud(true);
+      const res = await fetch('/api/bank-assets/fraud-rules/simulate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        setFraudSimMsg('⚡ RULE-TXN-01 Triggered: UPI Micro-Debit Velocity Burst (420 debits/min)! Settlement hold enforced.');
+        await fetchBankData();
+        if (activeOrg) switchOrg(activeOrg.id);
+        setTimeout(() => setFraudSimMsg(null), 5000);
+      }
+    } catch (err) {
+      console.error('Failed to simulate fraud rule:', err);
+    } finally {
+      setSimulatingFraud(false);
+    }
+  };
+
+  // Demo Tour Step 2: Trigger Attack
+  const handleDemoAttackTrigger = async () => {
+    if (!token) return;
+    try {
+      setDemoInjecting(true);
+      const res = await fetch('/api/bank-assets/simulate-scenario', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ scenarioId: 'scenario-3' })
+      });
+      if (res.ok) {
+        setDemoFeedback('⚡ Adversary Scenario 3 Injected: Payment Gateway compromised (+35 pts risk). Move to Step 3 for CERT-In notification.');
+        setDemoTourStep(3);
+        await fetchBankData();
+        if (activeOrg) switchOrg(activeOrg.id);
+      }
+    } catch (err) {
+      console.error('Demo attack injection failed:', err);
+    } finally {
+      setDemoInjecting(false);
+    }
+  };
+
+  // Demo Tour Step 4: Remediate Incident
+  const handleDemoRemediate = async () => {
+    if (!token) return;
+    try {
+      setDemoRemediating(true);
+      const res = await fetch('/api/bank-assets/remediate-incident', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ assetId: 'asset-payment' })
+      });
+      if (res.ok) {
+        setDemoFeedback('✓ Automated Countermeasure Deployed: Payment Gateway restored to HEALTHY! Cyber risk posture returned to baseline.');
+        await fetchBankData();
+        if (activeOrg) switchOrg(activeOrg.id);
+      }
+    } catch (err) {
+      console.error('Demo remediation failed:', err);
+    } finally {
+      setDemoRemediating(false);
+    }
+  };
 
   const currentRiskScore = riskData?.overallRiskScore ?? activeOrg?.riskScore ?? 84;
   const currentSeverity =
@@ -247,7 +341,15 @@ export const Overview: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+          <button
+            onClick={() => setShowDemoTour(true)}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs glow-cyan transition-all flex items-center space-x-2 shadow-lg"
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+            <span>60-Sec Bank SOC Demo Tour</span>
+          </button>
+
           <div
             onClick={() => navigate('/bank-assets')}
             className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 cursor-pointer flex items-center space-x-2.5 flex-1 sm:flex-initial transition-all"
@@ -366,6 +468,311 @@ export const Overview: React.FC = () => {
           <span className="text-[10px] text-blue-400/80">Playbook tasks</span>
         </div>
       </div>
+
+      {/* Fraud Simulation Alert Banner */}
+      {fraudSimMsg && (
+        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs font-mono flex items-center justify-between animate-fadeIn">
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            {fraudSimMsg}
+          </span>
+          <button
+            onClick={() => navigate('/threat-detection')}
+            className="px-2.5 py-1 rounded bg-rose-500/20 text-rose-300 font-bold hover:bg-rose-500/30 text-[10px]"
+          >
+            Investigate in Threat Sentry →
+          </button>
+        </div>
+      )}
+
+      {/* Banking Transaction Fraud Rules Sentry Strip */}
+      <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-purple-500/30 bg-gradient-to-r from-slate-950 via-slate-900 to-purple-950/20 shadow-xl space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center space-x-2.5">
+            <CreditCard className="w-5 h-5 text-purple-400" />
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
+                  Banking Transaction Fraud Rules Sentry
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-950 text-purple-400 border border-purple-800">
+                  REAL-TIME TXN TRIPWIRES
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Continuous algorithmic monitoring across NPCI UPI 2.0, ATM Switch NFS, and NetBanking RTGS/NEFT rails.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2.5 w-full sm:w-auto">
+            <button
+              onClick={handleSimulateFraud}
+              disabled={simulatingFraud}
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs font-mono font-bold transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
+            >
+              <Zap className={`w-3.5 h-3.5 ${simulatingFraud ? 'animate-spin' : ''}`} />
+              <span>{simulatingFraud ? 'Simulating Burst...' : 'Simulate UPI Fraud Burst'}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {fraudRules.length > 0 ? (
+            fraudRules.map((rule: any) => (
+              <div
+                key={rule.id}
+                className={`p-3.5 rounded-xl border space-y-2 transition-all ${
+                  rule.status === 'TRIGGERED'
+                    ? 'bg-rose-950/30 border-rose-500/40 shadow-lg shadow-rose-950/30 animate-pulse'
+                    : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] font-mono text-purple-400 font-bold">{rule.id}</span>
+                    <h4 className="text-xs font-bold text-slate-200 mt-0.5">{rule.name}</h4>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold shrink-0 border ${
+                      rule.status === 'TRIGGERED'
+                        ? 'bg-rose-950 text-rose-400 border-rose-800'
+                        : 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                    }`}
+                  >
+                    ● {rule.status}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">{rule.description}</p>
+
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                  <span>Threshold: <strong className="text-slate-300">{rule.threshold}</strong></span>
+                  <span className="text-purple-400">{rule.channel}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-3 text-center text-xs text-slate-500 py-3 font-mono">
+              Connecting to Transaction Fraud Rules Engine...
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 60-Second Guided Pitch Tour Modal */}
+      {showDemoTour && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-2xl rounded-2xl border border-cyan-500/40 bg-slate-950 p-6 space-y-6 shadow-2xl relative">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold">
+                  <Play className="w-4 h-4 fill-current" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-100 uppercase tracking-tight">
+                    60-Second Bank SOC Guided Pitch Tour
+                  </h3>
+                  <div className="text-[11px] font-mono text-cyan-400">
+                    Smart India Hackathon (SIH) Live Demo Flow • 4 Controlled Stages
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDemoTour(false)}
+                className="text-slate-400 hover:text-slate-100 text-xs font-mono px-2 py-1 rounded bg-slate-900 border border-slate-800"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Step Navigation Progress Bar */}
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { step: 1, label: '1. Baseline & RBI' },
+                { step: 2, label: '2. Adversary Attack' },
+                { step: 3, label: '3. 6-Hr CERT-In' },
+                { step: 4, label: '4. Containment' }
+              ].map((s) => (
+                <button
+                  key={s.step}
+                  onClick={() => setDemoTourStep(s.step as any)}
+                  className={`py-2 px-1 text-center rounded-lg text-[10px] font-mono font-bold transition-all border ${
+                    demoTourStep === s.step
+                      ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50'
+                      : 'bg-slate-900/60 text-slate-500 border-slate-800 hover:text-slate-300'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tour Feedback Message */}
+            {demoFeedback && (
+              <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/40 text-cyan-300 text-xs font-mono">
+                {demoFeedback}
+              </div>
+            )}
+
+            {/* Step Content */}
+            {demoTourStep === 1 && (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-slate-100">Stage 1: Demo Bank Normal SOC Baseline</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Demonstrates how CyberGuard Grid continuously monitors 10 critical banking systems across 4 isolated network enclaves. The Cyber Risk Engine evaluates risk using a 10-factor weighted model and compares posture against 12 RBI CSITE controls.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
+                    <span className="text-slate-500 text-[10px] uppercase">Organization Identity</span>
+                    <div className="text-slate-200 font-bold">Demo Bank (org-1)</div>
+                    <div className="text-slate-400 text-[11px]">Scheduled Commercial Bank (BFSI)</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
+                    <span className="text-slate-500 text-[10px] uppercase">Enclave Architecture</span>
+                    <div className="text-emerald-400 font-bold">4 Microsegmented Zones</div>
+                    <div className="text-slate-400 text-[11px]">CBS & HSM Enclave Air-Gapped</div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={() => setDemoTourStep(2)}
+                    className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold font-mono transition-all"
+                  >
+                    Next: Adversary Attack Simulation →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {demoTourStep === 2 && (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-rose-400">Stage 2: Controlled Attack Injection (Live Threat Event)</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Simulate an adversary targeting Demo Bank's Payment Gateway with a high-velocity micro-debit burst (Scenario 3). Watch how the live bridge updates asset health, logs a critical security event, and increases the overall Cyber Risk score dynamically!
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30 space-y-2 text-xs font-mono">
+                  <div className="text-rose-400 font-bold flex items-center gap-1.5">
+                    <Flame className="w-4 h-4" />
+                    Target: UPI & Payment Gateway Processor (10.10.3.15)
+                  </div>
+                  <div className="text-slate-300">
+                    Adversary vector: 420 micro-debits/min to suspect merchant VPA handles.
+                  </div>
+                  <div className="text-slate-400 text-[11px]">
+                    Expected telemetry: Asset marks COMPROMISED, Risk score spikes +35 pts, rule RULE-TXN-01 triggers.
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between">
+                  <button
+                    onClick={() => setDemoTourStep(1)}
+                    className="text-xs font-mono text-slate-400 hover:text-slate-200"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    onClick={handleDemoAttackTrigger}
+                    disabled={demoInjecting}
+                    className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-slate-950 text-xs font-bold font-mono transition-all flex items-center space-x-1.5 disabled:opacity-50 shadow-lg"
+                  >
+                    <Zap className={`w-3.5 h-3.5 ${demoInjecting ? 'animate-spin' : ''}`} />
+                    <span>{demoInjecting ? 'Injecting Attack...' : 'Simulate UPI Attack Now ⚡'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {demoTourStep === 3 && (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-amber-400">Stage 3: Statutory 6-Hour Incident Notification (CERT-In)</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Under Section 70B(6) of the IT Act and CERT-In Directions 2022, banks must formally dispatch incident advisories within 6 hours. CyberGuard Grid automatically formats and outputs the official Annexure 1 incident notice!
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-900 border border-slate-800 space-y-2 text-xs font-mono">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-cyan-400 font-bold">ANNEXURE 1 DISPATCH GENERATOR</span>
+                    <span className="text-emerald-400">✓ 6-HOUR WINDOW MET</span>
+                  </div>
+                  <div className="text-slate-300">
+                    Tracking No: <span className="text-slate-100">CERTIN-IN-2026-DEMOBANK-EVT-001</span>
+                  </div>
+                  <div className="text-slate-400 text-[11px]">
+                    Includes technical IoCs, source IP ranges, ISO 8583 message switch impact, and CISO sign-off.
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between">
+                  <button
+                    onClick={() => navigate('/reports')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-mono"
+                  >
+                    View Official Annexure 1 in Reports ↗
+                  </button>
+                  <button
+                    onClick={() => setDemoTourStep(4)}
+                    className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold font-mono transition-all"
+                  >
+                    Next: Automated Containment →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {demoTourStep === 4 && (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-emerald-400">Stage 4: Automated Countermeasure & Posture Restoration</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Deploy automated response playbook: Freeze compromised merchant endpoints, apply WAF velocity throttling, and log forensic signatures to the immutable cryptographic DLT Trust Ledger.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-2 text-xs font-mono">
+                  <div className="text-emerald-400 font-bold flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4" />
+                    Response Playbook: PB-UPI-CONTAINMENT-01
+                  </div>
+                  <div className="text-slate-300">
+                    Actions: Throttle merchant endpoint, reset API sessions, verify Finacle CBS enclave integrity.
+                  </div>
+                  <div className="text-slate-400 text-[11px]">
+                    Expected telemetry: Asset status returns to HEALTHY, Bank Cyber Risk drops by ~22 pts!
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between">
+                  <button
+                    onClick={() => setDemoTourStep(3)}
+                    className="text-xs font-mono text-slate-400 hover:text-slate-200"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    onClick={handleDemoRemediate}
+                    disabled={demoRemediating}
+                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold font-mono transition-all flex items-center space-x-1.5 disabled:opacity-50 shadow-lg"
+                  >
+                    <CheckCircle className={`w-3.5 h-3.5 ${demoRemediating ? 'animate-spin' : ''}`} />
+                    <span>{demoRemediating ? 'Restoring Defense...' : 'Deploy Countermeasure Now ✓'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Banking Asset Health Overview Strip (Core 7 Assets) */}
       <div className="bg-[#0F1420]/80 border border-cyan-500/20 p-5 rounded-2xl shadow-xl">

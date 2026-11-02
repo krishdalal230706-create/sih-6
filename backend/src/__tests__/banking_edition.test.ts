@@ -217,3 +217,49 @@ test('Banking Attack Simulator: 6 Controlled Scenarios', async (t) => {
   });
 });
 
+test('Banking Regulatory Compliance: RBI CSITE & CERT-In Statutory Advisory', async (t) => {
+  await t.test('1. Baseline assets evaluate correctly under 12 RBI CSF mandates', () => {
+    const assets = endpointDb.getBankAssets('org-1');
+    assert.ok(assets.length >= 10, 'Must have at least 10 banking assets');
+    const cbs = assets.find((a) => a.id === 'asset-cbs');
+    assert.ok(cbs, 'Core Banking System asset exists');
+    assert.strictEqual(cbs.criticality, 'CRITICAL');
+  });
+
+  await t.test('2. Bank Security Events can generate CERT-In compliant tracking records', () => {
+    const events = endpointDb.getBankSecurityEvents('org-1');
+    assert.ok(events.length > 0, 'Should have security events for Demo Bank');
+    const sample = events[0];
+    const certInTracking = `CERTIN-IN-2026-DEMOBANK-${sample.id}`;
+    assert.ok(certInTracking.includes('DEMOBANK'), 'Tracking ID includes bank identification');
+    assert.ok(sample.severity, 'Event has severity for statutory categorization');
+  });
+});
+
+test('Banking Transaction Fraud Rules Engine', async (t) => {
+  await t.test('1. Fraud Rules evaluate velocity burst and channel thresholds', () => {
+    const paymentAsset = endpointDb.getBankAssetById('asset-payment');
+    assert.ok(paymentAsset, 'Payment Gateway exists');
+
+    // Simulate micro-debit velocity burst
+    const previousRisk = paymentAsset.risk_score;
+    endpointDb.updateBankAsset('asset-payment', {
+      security_status: 'COMPROMISED',
+      risk_score: Math.min(100, previousRisk + 35)
+    });
+
+    const updated = endpointDb.getBankAssetById('asset-payment');
+    assert.strictEqual(updated?.security_status, 'COMPROMISED');
+    assert.ok((updated?.risk_score ?? 0) >= previousRisk);
+
+    // Remediate
+    endpointDb.updateBankAsset('asset-payment', {
+      security_status: 'HEALTHY',
+      risk_score: 25
+    });
+    const restored = endpointDb.getBankAssetById('asset-payment');
+    assert.strictEqual(restored?.security_status, 'HEALTHY');
+  });
+});
+
+

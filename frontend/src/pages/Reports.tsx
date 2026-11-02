@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   FileText,
   Printer,
@@ -21,7 +21,14 @@ import {
   BarChart2,
   Zap,
   Radio,
-  Star
+  Star,
+  Landmark,
+  CheckCircle,
+  RefreshCw,
+  AlertOctagon,
+  FileCheck,
+  Layers,
+  Award
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -37,6 +44,29 @@ import {
   Cell
 } from 'recharts';
 import { useApp } from '../context/AppContext';
+
+interface RBIControl {
+  id: string;
+  category: string;
+  name: string;
+  mandate: string;
+  description: string;
+  status: 'COMPLIANT' | 'PARTIAL' | 'NON_COMPLIANT';
+  evidence: string;
+  remediationAction: string;
+}
+
+interface RBIScorecard {
+  institution: string;
+  regulatoryFramework: string;
+  complianceScore: number;
+  totalControls: number;
+  compliantCount: number;
+  partialCount: number;
+  nonCompliantCount: number;
+  controls: RBIControl[];
+  lastAuditTimestamp: string;
+}
 
 const SeverityBadge: React.FC<{ score: number }> = ({ score }) => {
   const s = score >= 80 ? 'CRITICAL' : score >= 65 ? 'HIGH' : score >= 45 ? 'MEDIUM' : 'LOW';
@@ -69,18 +99,100 @@ const RiskBar: React.FC<{ value: number; label: string }> = ({ value, label }) =
 };
 
 export const Reports: React.FC = () => {
-  const { activeOrg, riskData, incidents, responseActions, threatPatterns, ledgerRecords, attackScenarios, organizations } = useApp();
+  const { activeOrg, riskData, incidents, responseActions, threatPatterns, ledgerRecords, attackScenarios, organizations, token } = useApp();
+  const [activeTab, setActiveTab] = useState<'audit' | 'rbi' | 'certin'>('audit');
   const [isGenerated, setIsGenerated] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // RBI Scorecard state
+  const [rbiData, setRbiData] = useState<RBIScorecard | null>(null);
+  const [loadingRbi, setLoadingRbi] = useState(false);
+  const [remediatingControlId, setRemediatingControlId] = useState<string | null>(null);
+  const [rbiFeedback, setRbiFeedback] = useState<string | null>(null);
+
+  // CERT-In Advisory state
+  const [certInReport, setCertInReport] = useState<any>(null);
+  const [loadingCertIn, setLoadingCertIn] = useState(false);
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string>('INC-B-01');
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
+  // Fetch RBI Scorecard
+  const fetchRbiCompliance = async () => {
+    if (!token) return;
+    try {
+      setLoadingRbi(true);
+      const res = await fetch('/api/bank-assets/rbi-compliance', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setRbiData(d);
+      }
+    } catch (err) {
+      console.error('Failed to load RBI compliance data:', err);
+    } finally {
+      setLoadingRbi(false);
+    }
+  };
+
+  // Fetch CERT-In report
+  const fetchCertInReport = async (incidentId: string) => {
+    if (!token) return;
+    try {
+      setLoadingCertIn(true);
+      const res = await fetch(`/api/bank-assets/cert-in-report/${incidentId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setCertInReport(d.report);
+      }
+    } catch (err) {
+      console.error('Failed to load CERT-In advisory:', err);
+    } finally {
+      setLoadingCertIn(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'rbi') {
+      fetchRbiCompliance();
+    } else if (activeTab === 'certin') {
+      fetchCertInReport(selectedIncidentId);
+    }
+  }, [activeTab, token]);
+
+  const handleRemediateControl = async (controlId?: string) => {
+    if (!token) return;
+    try {
+      setRemediatingControlId(controlId || 'ALL');
+      const res = await fetch('/api/bank-assets/rbi-compliance/remediate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ controlId })
+      });
+      if (res.ok) {
+        setRbiFeedback(controlId ? `✓ Control ${controlId} remediated to COMPLIANT!` : '✓ All RBI control gaps remediated to 100% COMPLIANT!');
+        await fetchRbiCompliance();
+        setTimeout(() => setRbiFeedback(null), 4000);
+      }
+    } catch (err) {
+      console.error('Failed to remediate RBI control:', err);
+    } finally {
+      setRemediatingControlId(null);
+    }
+  };
+
   const handleGenerateReport = async () => {
     setIsGenerating(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 1000));
     setIsGenerated(true);
     setIsGenerating(false);
   };
@@ -88,8 +200,8 @@ export const Reports: React.FC = () => {
   const handlePrint = () => window.print();
 
   // Computed data
-  const orgIncidents = incidents.filter((i) => i.orgId === activeOrg?.id);
-  const orgActions   = responseActions.filter((a) => a.orgId === activeOrg?.id);
+  const orgIncidents = incidents.filter((i) => i.orgId === (activeOrg?.id || 'org-1'));
+  const orgActions   = responseActions.filter((a) => a.orgId === (activeOrg?.id || 'org-1'));
   const completedActions = orgActions.filter((a) => a.status === 'Completed');
   const pendingActions   = orgActions.filter((a) => a.status === 'Pending');
   const totalRiskReduced = completedActions.reduce((s, a) => s + a.estimatedRiskReduction, 0);
@@ -100,63 +212,391 @@ export const Reports: React.FC = () => {
 
   // Radar data for risk breakdown
   const radarData = activeOrg ? [
-    { subject: 'Auth',     score: activeOrg.riskBreakdown.authentication },
-    { subject: 'Network',  score: activeOrg.riskBreakdown.networkSecurity },
-    { subject: 'Data',     score: activeOrg.riskBreakdown.dataSecurity },
-    { subject: 'Endpoint', score: activeOrg.riskBreakdown.endpointSecurity },
-    { subject: 'Users',    score: activeOrg.riskBreakdown.userRisk },
+    { subject: 'Auth',     score: activeOrg.riskBreakdown?.authentication ?? 25 },
+    { subject: 'Network',  score: activeOrg.riskBreakdown?.networkSecurity ?? 30 },
+    { subject: 'Data',     score: activeOrg.riskBreakdown?.dataSecurity ?? 35 },
+    { subject: 'Endpoint', score: activeOrg.riskBreakdown?.endpointSecurity ?? 58 },
+    { subject: 'Users',    score: activeOrg.riskBreakdown?.userRisk ?? 40 },
   ] : [];
 
-  // Bar chart: orgs risk comparison
-  const orgBarData = Object.values(
-    organizations.reduce((acc: any, o) => { acc[o.id] = o; return acc; }, {})
-  ).map((o: any) => ({ name: o.name.split(' ')[0], score: o.riskScore }));
+  const orgBarData = [
+    { name: 'Demo Bank', score: riskScore },
+    { name: 'Apex Fin', score: 62 },
+    { name: 'Bharat Pay', score: 48 },
+    { name: 'State Ins', score: 55 }
+  ];
 
-  const topScenario = attackScenarios.sort((a, b) => b.scenarioRisk - a.scenarioRisk)[0];
+  const topScenario = (attackScenarios || []).slice().sort((a, b) => b.scenarioRisk - a.scenarioRisk)[0] || {
+    id: 'scenario-3',
+    name: 'Payment Gateway Fraud & Velocity Burst',
+    scenarioRisk: 88,
+    affectedAsset: 'Payment Gateway',
+    severity: 'CRITICAL',
+    criticalWeakPoint: 'API Rate Limiting & NPCI Gateway Verification',
+    nodes: []
+  };
 
   const scoreColor = riskScore >= 80 ? '#f43f5e' : riskScore >= 65 ? '#f59e0b' : '#10b981';
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      {/* ── Page Header ── */}
+      {/* ── Page Header & Tab Selector ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100 uppercase">Security Reports</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100 uppercase">Banking Reports & Regulatory Compliance</h1>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
+              RBI & CERT-IN ALIGNED
+            </span>
+          </div>
           <p className="text-xs text-slate-400 mt-1">
-            Generate executive-grade cyber risk audit reports with live data, risk breakdowns, and remediation status.
+            Generate executive CISO audit briefings, real-time RBI CSITE compliance scorecards, and statutory 6-hour CERT-In incident advisories for Demo Bank.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
-          <button
-            onClick={handleGenerateReport}
-            disabled={isGenerating}
-            className="flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs glow-cyan transition-all shadow-lg disabled:opacity-60"
-          >
-            {isGenerating ? (
-              <Activity className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-            <span>{isGenerating ? 'Generating...' : 'Generate Security Report'}</span>
-          </button>
-          {isGenerated && (
+          {activeTab === 'audit' && (
             <button
-              onClick={handlePrint}
-              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs font-bold transition-all"
+              onClick={handleGenerateReport}
+              disabled={isGenerating}
+              className="flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs glow-cyan transition-all shadow-lg disabled:opacity-60"
             >
-              <Printer className="w-4 h-4" />
-              <span>Print / Export PDF</span>
+              {isGenerating ? <Activity className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              <span>{isGenerating ? 'Compiling Audit Data...' : 'Generate CISO Executive Report'}</span>
             </button>
           )}
+          <button
+            onClick={handlePrint}
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs font-bold transition-all"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Print / Export PDF</span>
+          </button>
         </div>
       </div>
 
-      {/* ── Report Type Cards ── */}
-      {!isGenerated && (
+      {/* ── Report Mode Navigation Pills ── */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveTab('audit')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'audit'
+              ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Executive CISO Audit Briefing</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('rbi')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'rbi'
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+          }`}
+        >
+          <Award className="w-4 h-4" />
+          <span>RBI CSF & CSITE Scorecard (12 Controls)</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('certin')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'certin'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+          }`}
+        >
+          <Landmark className="w-4 h-4" />
+          <span>Statutory 6-Hour CERT-In Advisory (Annexure 1)</span>
+        </button>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════
+          TAB 2: RBI CYBER SECURITY FRAMEWORK (CSF) SCORECARD
+      ══════════════════════════════════════════════════════════ */}
+      {activeTab === 'rbi' && (
+        <div className="space-y-6">
+          {rbiFeedback && (
+            <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-between animate-fadeIn">
+              <span className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                {rbiFeedback}
+              </span>
+            </div>
+          )}
+
+          {loadingRbi ? (
+            <div className="p-12 text-center text-slate-400 font-mono flex items-center justify-center space-x-3">
+              <Activity className="w-5 h-5 animate-spin text-cyan-400" />
+              <span>Auditing 12 RBI Cyber Security Framework (CSITE) Controls against Demo Bank Systems...</span>
+            </div>
+          ) : rbiData ? (
+            <div className="space-y-6">
+              {/* RBI Hero Summary Card */}
+              <div className="glass-panel p-6 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Landmark className="w-5 h-5 text-emerald-400" />
+                    <span className="text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">Reserve Bank of India (RBI) Cyber Security Baseline</span>
+                  </div>
+                  <h2 className="text-2xl font-black text-slate-100 uppercase tracking-tight">
+                    Demo Bank CSITE Compliance Scorecard
+                  </h2>
+                  <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
+                    Evaluated under the <strong className="text-slate-200">RBI Master Directions on Information Technology Governance (2023)</strong> and the <strong className="text-slate-200">RBI Cyber Security Framework for Scheduled Commercial Banks</strong>.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  {/* Gauge */}
+                  <div className="flex flex-col items-center p-4 rounded-xl bg-slate-950/80 border border-slate-800 min-w-[140px]">
+                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1">Compliance Rate</div>
+                    <div className="text-4xl font-black font-mono text-emerald-400">{rbiData.complianceScore}%</div>
+                    <div className="text-[10px] font-mono text-slate-400 mt-1">
+                      {rbiData.compliantCount}/{rbiData.totalControls} Mandates Verified
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleRemediateControl()}
+                    disabled={remediatingControlId === 'ALL'}
+                    className="flex flex-col items-center justify-center px-4 py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 mb-1 ${remediatingControlId === 'ALL' ? 'animate-spin' : ''}`} />
+                    <span>Auto-Remediate All Gaps</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 12 RBI Controls Grid */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                  <h3 className="text-xs font-bold font-mono text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    12 Regulatory CSITE Controls & Continuous Telemetry Evidence
+                  </h3>
+                  <span className="text-[10px] font-mono text-slate-500">Live Continuous Assessment Mode</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {rbiData.controls.map((ctrl) => (
+                    <div
+                      key={ctrl.id}
+                      className={`p-4 rounded-xl border space-y-2.5 transition-all ${
+                        ctrl.status === 'COMPLIANT'
+                          ? 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'
+                          : ctrl.status === 'PARTIAL'
+                          ? 'bg-amber-950/20 border-amber-500/30'
+                          : 'bg-rose-950/20 border-rose-500/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] font-mono font-bold text-cyan-400">{ctrl.id} • {ctrl.category}</span>
+                          <h4 className="text-xs font-bold text-slate-100">{ctrl.name}</h4>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold shrink-0 border ${
+                            ctrl.status === 'COMPLIANT'
+                              ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800'
+                              : ctrl.status === 'PARTIAL'
+                              ? 'bg-amber-950/60 text-amber-400 border-amber-800'
+                              : 'bg-rose-950/60 text-rose-400 border-rose-800 animate-pulse'
+                          }`}
+                        >
+                          {ctrl.status}
+                        </span>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 leading-relaxed">{ctrl.description}</p>
+
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-[10px] font-mono space-y-1">
+                        <div className="text-slate-500 uppercase text-[9px]">Mandate: {ctrl.mandate}</div>
+                        <div className="text-slate-300 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3 h-3 text-cyan-400 shrink-0" />
+                          <span>Telemetry Evidence: {ctrl.evidence}</span>
+                        </div>
+                      </div>
+
+                      {ctrl.status !== 'COMPLIANT' && (
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-amber-400 font-mono">{ctrl.remediationAction}</span>
+                          <button
+                            onClick={() => handleRemediateControl(ctrl.id)}
+                            disabled={remediatingControlId === ctrl.id}
+                            className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold font-mono transition-all disabled:opacity-50"
+                          >
+                            {remediatingControlId === ctrl.id ? 'Fixing...' : 'Fix Gap Now →'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════
+          TAB 3: MANDATED 6-HOUR CERT-IN ADVISORY EXPORTER
+      ══════════════════════════════════════════════════════════ */}
+      {activeTab === 'certin' && (
+        <div className="space-y-6">
+          {/* Controls Bar */}
+          <div className="glass-panel p-4 rounded-xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3">
+              <span className="text-xs font-mono text-slate-400 uppercase">Select Incident:</span>
+              <select
+                value={selectedIncidentId}
+                onChange={(e) => {
+                  setSelectedIncidentId(e.target.value);
+                  fetchCertInReport(e.target.value);
+                }}
+                className="bg-slate-950 border border-slate-700 text-slate-200 text-xs font-mono rounded-lg px-3 py-1.5 focus:border-cyan-500 focus:outline-none"
+              >
+                <option value="INC-B-01">INC-B-01: UPI Gateway High-Velocity Micro-Debit Attack</option>
+                <option value="INC-B-02">INC-B-02: Internet Banking Credential Stuffing Campaign</option>
+                <option value="INC-B-03">INC-B-03: Teller Workstation Privilege Escalation Attempt</option>
+                <option value="INC-B-04">INC-B-04: Controlled Ransomware Canary Trigger</option>
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <span className="px-2.5 py-1 rounded text-[10px] font-mono font-bold bg-rose-950 text-rose-400 border border-rose-800 flex items-center gap-1.5">
+                <Clock className="w-3 h-3" />
+                6-HOUR STATUTORY WINDOW COMPLIANT
+              </span>
+            </div>
+          </div>
+
+          {loadingCertIn ? (
+            <div className="p-12 text-center text-slate-400 font-mono flex items-center justify-center space-x-3">
+              <Activity className="w-5 h-5 animate-spin text-cyan-400" />
+              <span>Formatting Official CERT-In Annexure 1 Dispatch Notice...</span>
+            </div>
+          ) : certInReport ? (
+            <div className="glass-panel p-8 rounded-2xl border border-slate-700 bg-slate-950/80 space-y-6 print:border-black print:text-black print:bg-white">
+              {/* Official Header */}
+              <div className="text-center space-y-1.5 border-b border-slate-800 pb-5">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-bold">
+                  {certInReport.statutoryMandate}
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-slate-100 uppercase tracking-tight">
+                  {certInReport.formTitle}
+                </h2>
+                <div className="text-xs font-mono text-slate-400">
+                  Ref Tracking No: <strong className="text-slate-200">{certInReport.trackingNumber}</strong> • Dispatched: {certInReport.generatedAtIST}
+                </div>
+              </div>
+
+              {/* Grid 1: Reporting Entity */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                  <span className="text-[10px] text-cyan-400 uppercase font-bold">1. Reporting Entity Particulars</span>
+                  <div className="text-slate-200 font-bold text-sm">{certInReport.reportingEntity.organizationName}</div>
+                  <div className="text-slate-400">{certInReport.reportingEntity.institutionType}</div>
+                  <div className="text-slate-400">{certInReport.reportingEntity.headquarters}</div>
+                  <div className="text-slate-300 text-[11px] pt-1">CISO Nodal: {certInReport.reportingEntity.cisoOfficeContact}</div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                  <span className="text-[10px] text-rose-400 uppercase font-bold">2. Incident Triage Particulars</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Incident Classification:</span>
+                    <span className="text-rose-400 font-bold">{certInReport.incidentSummary.category}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Severity Level:</span>
+                    <SeverityBadge score={certInReport.incidentSummary.severity === 'CRITICAL' ? 95 : 75} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Time of Initial Detection:</span>
+                    <span className="text-slate-200">{certInReport.incidentSummary.detectedAtIST}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Affected Asset Identifier:</span>
+                    <span className="text-cyan-400 font-bold">{certInReport.incidentSummary.affectedAsset}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Technical Description */}
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">3. Technical Incident Narration & Initial Root Cause</span>
+                <p className="text-xs text-slate-300 leading-relaxed font-mono">
+                  {certInReport.incidentSummary.description}
+                </p>
+                <div className="text-[11px] font-mono text-cyan-400 pt-1">
+                  Primary Sensor Detection Source: {certInReport.incidentSummary.detectionSource}
+                </div>
+              </div>
+
+              {/* IoCs & Evidence */}
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3 font-mono text-xs">
+                <span className="text-[10px] text-amber-400 uppercase font-bold">4. Technical Indicators of Compromise (IoCs)</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                  <div>
+                    <div className="text-slate-500 uppercase text-[9px]">Source IP Subnets / C2 Proxies:</div>
+                    <ul className="list-disc list-inside text-slate-300 mt-1 space-y-0.5">
+                      {certInReport.technicalIoCs.sourceIpRanges.map((ip: string) => (
+                        <li key={ip}>{ip}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="text-slate-500 uppercase text-[9px]">Targeted Communication Protocols:</div>
+                    <ul className="list-disc list-inside text-slate-300 mt-1 space-y-0.5">
+                      {certInReport.technicalIoCs.targetedProtocols.map((proto: string) => (
+                        <li key={proto}>{proto}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-300">
+                  <span className="text-slate-500">Compromise Telemetry: </span>
+                  {certInReport.technicalIoCs.compromiseEvidence}
+                </div>
+              </div>
+
+              {/* Immediate Containment Actions */}
+              <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-2 font-mono text-xs">
+                <span className="text-[10px] text-emerald-400 uppercase font-bold">5. Immediate Containment & Remedial Actions Executed</span>
+                <div className="text-slate-200">
+                  <strong>Action Deployed:</strong> {certInReport.containmentAndMitigation.immediateActionTaken}
+                </div>
+                <div className="text-slate-300 text-[11px]">
+                  <strong>PII / Data Impact Assessment:</strong> {certInReport.containmentAndMitigation.dataImpactAssessment}
+                </div>
+                <div className="text-slate-300 text-[11px]">
+                  <strong>Cryptographic Forensic Trail:</strong> {certInReport.containmentAndMitigation.forensicStatus}
+                </div>
+              </div>
+
+              {/* Officer Sign-off */}
+              <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 font-mono text-xs text-slate-400">
+                <div>
+                  <div className="text-slate-200 font-bold">{certInReport.officerSignOff.signatoryName}</div>
+                  <div className="text-[11px]">{certInReport.officerSignOff.designation}</div>
+                </div>
+                <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                  ✓ {certInReport.officerSignOff.authorizationStatus}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════
+          TAB 1: CISO EXECUTIVE SECURITY AUDIT REPORT
+      ══════════════════════════════════════════════════════════ */}
+      {activeTab === 'audit' && !isGenerated && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {[
-            { icon: ShieldAlert, title: 'Executive Risk Report', desc: 'Complete cyber risk posture, breakdown scores, and critical vulnerabilities for executive review.', color: 'text-rose-400', border: 'border-rose-800/50' },
-            { icon: Crosshair,   title: 'Attack Simulation Summary', desc: 'Simulated adversary progression, exploited weak points, and recommended mitigations.', color: 'text-amber-400', border: 'border-amber-800/50' },
+            { icon: ShieldAlert, title: 'CISO Executive Risk Audit', desc: 'Complete banking cyber risk posture, 10-factor weighted scoring, and board audit summary.', color: 'text-rose-400', border: 'border-rose-800/50' },
+            { icon: Award,       title: 'RBI CSITE Regulatory Audit', desc: 'Continuous compliance against 12 mandated RBI controls, CBS isolation, and HSM integrity.', color: 'text-emerald-400', border: 'border-emerald-800/50' },
             { icon: Database,    title: 'DLT Trust Audit Report', desc: 'Immutable threat pattern ledger records, block integrity verification, and validator consensus.', color: 'text-cyan-400', border: 'border-cyan-800/50' },
           ].map((r) => (
             <div key={r.title} className={`glass-panel p-6 rounded-2xl border ${r.border} space-y-3 cursor-pointer hover:scale-[1.01] transition-transform`} onClick={handleGenerateReport}>
@@ -165,7 +605,7 @@ export const Reports: React.FC = () => {
               <p className="text-xs text-slate-400 leading-relaxed">{r.desc}</p>
               <div className={`text-[10px] font-mono ${r.color} flex items-center space-x-1`}>
                 <Star className="w-3 h-3" />
-                <span>Click to generate →</span>
+                <span>Click to generate report →</span>
               </div>
             </div>
           ))}
@@ -173,9 +613,9 @@ export const Reports: React.FC = () => {
       )}
 
       {/* ══════════════════════════════════════════════════════════
-          GENERATED REPORT
+          GENERATED REPORT VIEW (CISO BRIEFING)
       ══════════════════════════════════════════════════════════ */}
-      {isGenerated && activeOrg && (
+      {activeTab === 'audit' && isGenerated && activeOrg && (
         <div ref={reportRef} className="space-y-6 print:space-y-4">
 
           {/* ── Report Cover ── */}
@@ -454,7 +894,7 @@ export const Reports: React.FC = () => {
                 <div className="space-y-2">
                   <div className="text-[10px] font-mono text-slate-500 uppercase">Attack Progression Stages</div>
                   <div className="flex flex-wrap gap-2">
-                    {topScenario.nodes.map((n, i) => (
+                    {topScenario.nodes.map((n: any, i: number) => (
                       <div key={n.id} className="flex items-center space-x-1 text-[10px] font-mono">
                         <span className="w-4 h-4 rounded-full bg-rose-900 text-rose-300 flex items-center justify-center text-[9px] font-bold">{i+1}</span>
                         <span className="text-slate-300">{n.stage}</span>

@@ -514,3 +514,313 @@ bankAssetRouter.post('/remediate-incident', requireAuth, (req: AuthenticatedRequ
   });
 });
 
+// RBI Compliance In-Memory / Dynamic State Store for Demo Bank
+let rbiControlOverrides: Record<string, 'COMPLIANT' | 'PARTIAL' | 'NON_COMPLIANT'> = {};
+
+// GET /api/bank-assets/rbi-compliance - RBI Cyber Security Framework (CSF) Scorecard
+bankAssetRouter.get('/rbi-compliance', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const orgId = user.orgId || 'org-1';
+  const assets = endpointDb.getBankAssets(orgId);
+
+  const paymentCompromised = assets.some((a) => a.id === 'asset-payment' && a.security_status === 'COMPROMISED');
+  const netbankAtRisk = assets.some((a) => a.id === 'asset-netbank' && (a.security_status === 'AT_RISK' || a.security_status === 'COMPROMISED'));
+
+  const baseControls = [
+    {
+      id: 'RBI-CSF-01',
+      category: 'Network Segmentation & Enclave Isolation',
+      name: 'Core Banking System (CBS) Physical/Logical Enclave Isolation',
+      mandate: 'RBI Master Directions on IT Governance - Section 4.2',
+      description: 'Finacle Core Banking System must reside in an air-gapped internal enclave with zero direct public ingress.',
+      status: rbiControlOverrides['RBI-CSF-01'] || 'COMPLIANT',
+      evidence: 'Zone 3 Private Enclave isolated via Palo Alto NGFW & strict mTLS boundary.',
+      remediationAction: 'Maintain strict microsegmentation rules on CBS VLAN.'
+    },
+    {
+      id: 'RBI-CSF-02',
+      category: 'Cryptographic Security & Key Management',
+      name: 'Hardware Security Module (HSM) Dedicated Cryptographic Key Verification',
+      mandate: 'RBI Cyber Security Framework Annex-1 (HSM Controls)',
+      description: 'PIN blocks, card CVV verification, and PKI digital certificates must be executed strictly within FIPS 140-2 Level 3 HSM.',
+      status: rbiControlOverrides['RBI-CSF-02'] || 'COMPLIANT',
+      evidence: 'Thales Luna HSM cluster integrated with Keycloak PKI at 10.10.1.12.',
+      remediationAction: 'Perform routine quarterly HSM key rotation verification.'
+    },
+    {
+      id: 'RBI-CSF-03',
+      category: 'Access Control & Authentication',
+      name: 'Mandatory Multi-Factor (FIDO2/WebAuthn) for Privileged Banking Access',
+      mandate: 'RBI CSITE Circular 2021/89 - Identity Governance',
+      description: 'All teller, branch manager, and SOC administrator portals must enforce phishing-resistant hardware MFA.',
+      status: rbiControlOverrides['RBI-CSF-03'] || 'COMPLIANT',
+      evidence: 'FIDO2 WebAuthn & biometric MPIN enforced across core management interfaces.',
+      remediationAction: 'Audit active branch teller sessions and revoke non-FIDO2 tokens.'
+    },
+    {
+      id: 'RBI-CSF-04',
+      category: 'Customer Data Protection & Privacy',
+      name: 'Customer Information File (CIF) Encryption at Rest (AES-256) & Transit (TLS 1.3)',
+      mandate: 'RBI Master Directions Section 7 - Customer Data Protection',
+      description: 'Aadhaar, PAN, account balances, and KYC PII must be encrypted using AES-256 with zero cleartext logging.',
+      status: rbiControlOverrides['RBI-CSF-04'] || 'COMPLIANT',
+      evidence: 'Oracle RAC 19c Transparent Data Encryption (TDE) active with AES-256.',
+      remediationAction: 'Verify masking rules on teller workstation CSV exports.'
+    },
+    {
+      id: 'RBI-CSF-05',
+      category: 'Continuous SOC Telemetry & Monitoring',
+      name: '24x7 Security Operations Center (SOC) Real-Time Alerting',
+      mandate: 'RBI Cyber Security Framework Section 3.1 - 24x7 SOC',
+      description: 'Real-time telemetry ingestion across payment switches, ATMs, NetBanking, and branch endpoints with sub-minute alert dispatch.',
+      status: rbiControlOverrides['RBI-CSF-05'] || 'COMPLIANT',
+      evidence: 'Continuous CyberGuard Grid SOC Telemetry Engine active with WebSocket streaming.',
+      remediationAction: 'Review SOC SLA for critical alerts to maintain under 5 minutes.'
+    },
+    {
+      id: 'RBI-CSF-06',
+      category: 'Payment Switch Security',
+      name: 'NPCI & UPI 2.0 Real-Time Velocity Throttling & Fraud Detection',
+      mandate: 'NPCI Procedural Guidelines & RBI Cyber Security Guidelines for Payments',
+      description: 'High-frequency transaction probing and micro-debit velocity anomalies must trigger automatic throttling.',
+      status: rbiControlOverrides['RBI-CSF-06'] || (paymentCompromised ? 'NON_COMPLIANT' : 'COMPLIANT'),
+      evidence: paymentCompromised ? 'High-velocity burst active (>400 debits/min); manual containment pending.' : 'UPI AI Sentry active; velocity thresholds set to 12 debits/min.',
+      remediationAction: 'Execute containment playbook to throttle suspect merchant VPAs.'
+    },
+    {
+      id: 'RBI-CSF-07',
+      category: 'Web Application Security & Anti-Phishing',
+      name: 'WAF Rate Limiting & Rogue Domain / Anti-Phishing Telemetry',
+      mandate: 'RBI CSITE Circular 2022/104 - Anti-Phishing Directives',
+      description: 'Internet Banking reverse proxy must enforce adaptive rate-limiting, CAPTCHA on failed login bursts, and active takedown feeds.',
+      status: rbiControlOverrides['RBI-CSF-07'] || (netbankAtRisk ? 'PARTIAL' : 'COMPLIANT'),
+      evidence: netbankAtRisk ? 'Credential stuffing burst flagged; step-up challenges active on affected CIDRs.' : 'WAF reverse proxy active with automated IP reputation filtering.',
+      remediationAction: 'Enforce Step-Up OTP challenge across all NetBanking login endpoints.'
+    },
+    {
+      id: 'RBI-CSF-08',
+      category: 'Disaster Recovery & Business Continuity',
+      name: 'Immutable WORM Storage for Off-Site Disaster Recovery Backups',
+      mandate: 'RBI Master Directions Section 9 - Business Continuity & DR',
+      description: 'Synchronous data replication to off-site location (Hyderabad) with Write-Once-Read-Many (WORM) ransomware protection.',
+      status: rbiControlOverrides['RBI-CSF-08'] || 'COMPLIANT',
+      evidence: 'Hyderabad DR site synchronized with 0.8s lag; NetApp SnapLock WORM active.',
+      remediationAction: 'Conduct semi-annual automated DR failover drill.'
+    },
+    {
+      id: 'RBI-CSF-09',
+      category: 'Database Activity Monitoring (DAM)',
+      name: 'Real-Time Database Activity Monitoring & Off-Hours Query Alarms',
+      mandate: 'RBI CSITE Circular 2020 - Core Banking Database Auditing',
+      description: 'Bulk query exports outside normal business clearing windows must trigger instant supervisory alerts.',
+      status: rbiControlOverrides['RBI-CSF-09'] || 'COMPLIANT',
+      evidence: 'DAM agent deployed on Oracle RAC; 10,000+ record thresholds configured.',
+      remediationAction: 'Verify authorized change windows with Head of Core Operations.'
+    },
+    {
+      id: 'RBI-CSF-10',
+      category: 'Endpoint Security & Peripheral Lockdown',
+      name: 'Removable Media (USB) Port Lockdown & Behavioral EDR on Teller PCs',
+      mandate: 'RBI Cyber Security Framework Annex-2 (Endpoint Hardening)',
+      description: 'All branch teller workstations must have mass storage ports disabled by GPO and run behavioral canary tripwires.',
+      status: rbiControlOverrides['RBI-CSF-10'] || 'COMPLIANT',
+      evidence: 'Group Policy enforces USB storage blocking; behavioral EDR agent deployed.',
+      remediationAction: 'Audit branch endpoint agent heartbeat across regional branches.'
+    },
+    {
+      id: 'RBI-CSF-11',
+      category: 'Board Governance & CISO Oversight',
+      name: 'Board Information Security Committee (ITSC) & CISO Quarterly Reporting',
+      mandate: 'RBI Master Directions Section 2.1 - Governance Structure',
+      description: 'Regular quantification of cyber risk, threat intelligence metrics, and audit hash-chain logs presented to Board of Directors.',
+      status: rbiControlOverrides['RBI-CSF-11'] || 'COMPLIANT',
+      evidence: 'Executive CISO Briefing generator & Cryptographic DLT Trust Ledger active.',
+      remediationAction: 'Schedule next quarterly cyber risk presentation for ITSC.'
+    },
+    {
+      id: 'RBI-CSF-12',
+      category: 'Statutory Incident Notification',
+      name: 'Mandatory 6-Hour Incident Notification to CERT-In & RBI CSITE',
+      mandate: 'CERT-In Directions 2022 & RBI Cyber Incident Reporting Guidelines',
+      description: 'All critical cybersecurity incidents must be formally reported to CERT-In and RBI within 6 hours of discovery.',
+      status: rbiControlOverrides['RBI-CSF-12'] || 'COMPLIANT',
+      evidence: 'Automated CERT-In Annexure 1 incident advisory exporter active.',
+      remediationAction: 'Generate statutory report upon any critical severity incident triage.'
+    }
+  ];
+
+  const compliantCount = baseControls.filter((c) => c.status === 'COMPLIANT').length;
+  const partialCount = baseControls.filter((c) => c.status === 'PARTIAL').length;
+  const nonCompliantCount = baseControls.filter((c) => c.status === 'NON_COMPLIANT').length;
+  const scorePercentage = Math.round(((compliantCount + partialCount * 0.5) / baseControls.length) * 100);
+
+  return res.json({
+    institution: 'Demo Bank',
+    regulatoryFramework: 'RBI Cyber Security Framework (CSITE) & Master Directions on IT Governance',
+    complianceScore: scorePercentage,
+    totalControls: baseControls.length,
+    compliantCount,
+    partialCount,
+    nonCompliantCount,
+    controls: baseControls,
+    lastAuditTimestamp: new Date().toISOString()
+  });
+});
+
+// POST /api/bank-assets/rbi-compliance/remediate - Remediate specific RBI Control Gap
+bankAssetRouter.post('/rbi-compliance/remediate', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const orgId = user.orgId || 'org-1';
+  const { controlId } = req.body;
+
+  if (controlId) {
+    rbiControlOverrides[controlId] = 'COMPLIANT';
+    endpointDb.appendAudit(user.email, orgId, 'RBI_CONTROL_REMEDIATED', `Remediated control gap for ${controlId} to COMPLIANT.`);
+  } else {
+    rbiControlOverrides = {};
+    endpointDb.appendAudit(user.email, orgId, 'RBI_ALL_CONTROLS_REMEDIATED', 'All RBI compliance gaps remediated to 100% baseline.');
+  }
+
+  return res.json({
+    success: true,
+    message: `Control ${controlId || 'ALL'} successfully remediated to COMPLIANT.`
+  });
+});
+
+// GET /api/bank-assets/cert-in-report/:id - Mandated 6-Hour Incident Advisory Exporter
+bankAssetRouter.get('/cert-in-report/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const orgId = user.orgId || 'org-1';
+  const event = endpointDb.getBankSecurityEventById(req.params.id) || endpointDb.getBankSecurityEvents(orgId, 1)[0];
+
+  const reportId = `CERTIN-IN-2026-DEMOBANK-${req.params.id || 'EVT-001'}`;
+  const now = new Date();
+
+  const certInReport = {
+    formTitle: 'ANNEXURE 1: CYBER INCIDENT REPORT TO CERT-IN & RBI CSITE',
+    statutoryMandate: 'Reporting under Section 70B(6) of IT Act, 2000 & CERT-In Directions No. 20(3)/2022-CERT-In',
+    mandatoryTimeline: 'Within 6 hours of incident identification',
+    trackingNumber: reportId,
+    generatedAtIST: now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST',
+    reportingEntity: {
+      organizationName: 'Demo Bank',
+      institutionType: 'Scheduled Commercial Bank (BFSI)',
+      country: 'India',
+      headquarters: 'Connaught Place, New Delhi - 110001',
+      cisoOfficeContact: 'ciso@demobank.com | +91-11-2345-6789'
+    },
+    incidentSummary: {
+      incidentId: event?.id || 'evt-001',
+      category: event?.event_category || 'Payment Fraud Anomaly',
+      severity: event?.severity || 'CRITICAL',
+      detectedAtIST: new Date(event?.timestamp || now.toISOString()).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST',
+      affectedAsset: event?.affected_asset_name || 'UPI & Payment Gateway Processor (10.10.3.15)',
+      description: event?.description || 'High-volume velocity micro-debit burst detected on UPI Gateway switch.',
+      detectionSource: event?.detection_source || 'UPI AI Sentry & WAF Rate Limiter',
+      investigationStatus: event?.investigation_status || 'INVESTIGATING'
+    },
+    technicalIoCs: {
+      sourceIpRanges: ['198.51.100.42/28', '203.0.113.19 (Proxy Node)', '185.220.101.5 (Tor Exit)'],
+      targetedProtocols: ['ISO 8583 Message Switch', 'NPCI UPI 2.0 API Gateway', 'HTTPS / WAF'],
+      attackClassification: 'MITRE ATT&CK T1110 (Brute Force) & T1071.001 (Web Protocols)',
+      compromiseEvidence: 'Velocity spike of 420 micro-debits/min originating from suspect merchant VPA handles.'
+    },
+    containmentAndMitigation: {
+      immediateActionTaken: event?.recommended_action || 'Velocity throttling engaged on merchant endpoint; suspect VPAs frozen.',
+      dataImpactAssessment: 'No core banking customer PII leaked. Finacle CBS enclave integrity verified intact.',
+      forensicStatus: 'Memory snapshot captured; logs chained to immutable cryptographic DLT ledger.',
+      containmentStatus: event?.investigation_status === 'RESOLVED' ? 'Neutralized and Remediated' : 'Active Containment & Throttling in Progress'
+    },
+    officerSignOff: {
+      signatoryName: 'Bank SOC Administrator',
+      designation: 'Lead Incident Commander, Cyber Defense Operations',
+      authorizationStatus: 'OFFICIALLY STAMPED & DISPATCHED'
+    }
+  };
+
+  return res.json({ report: certInReport });
+});
+
+// GET /api/bank-assets/fraud-rules - Banking Transaction Fraud Rules Telemetry
+bankAssetRouter.get('/fraud-rules', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const orgId = user.orgId || 'org-1';
+  const assets = endpointDb.getBankAssets(orgId);
+  const paymentCompromised = assets.some((a) => a.id === 'asset-payment' && a.security_status === 'COMPROMISED');
+
+  const fraudRules = [
+    {
+      id: 'RULE-TXN-01',
+      name: 'UPI Micro-Debit Velocity Burst Sentry',
+      description: 'Detects rapid burst of >10 micro-transactions (< ₹5.00) within 60 seconds targeting unverified merchant VPAs.',
+      threshold: '>10 debits / minute',
+      channel: 'UPI 2.0 / IMPS Gateway',
+      status: paymentCompromised ? 'TRIGGERED' : 'MONITORING',
+      evaluationsCount: 14250,
+      triggeredCount: paymentCompromised ? 420 : 0,
+      mitigationAction: 'Immediate velocity throttling and merchant settlement hold.'
+    },
+    {
+      id: 'RULE-TXN-02',
+      name: 'ATM Impossible Geolocation Travel Detector',
+      description: 'Flags card authorization requests occurring across distant locations (>500 km) within an impossible physical transit window (< 45 mins).',
+      threshold: '>500 km / 45 mins',
+      channel: 'ATM Switch / NPCI NFS',
+      status: 'MONITORING',
+      evaluationsCount: 8940,
+      triggeredCount: 2,
+      mitigationAction: 'Trigger step-up OTP challenge and cardholder SMS alert.'
+    },
+    {
+      id: 'RULE-TXN-03',
+      name: 'High-Value Transfer Post-Credential Reset Tripwire',
+      description: 'Detects high-value RTGS/NEFT transaction (> ₹2,00,000) initiated within 30 minutes of mobile MPIN or password change.',
+      threshold: '> ₹2,00,000 within 30m of reset',
+      channel: 'NetBanking / Mobile API',
+      status: 'MONITORING',
+      evaluationsCount: 3210,
+      triggeredCount: 1,
+      mitigationAction: 'Enforce 4-hour cooling window and branch verification.'
+    }
+  ];
+
+  return res.json({ rules: fraudRules });
+});
+
+// POST /api/bank-assets/fraud-rules/simulate - Simulate Fraud Burst
+bankAssetRouter.post('/fraud-rules/simulate', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const orgId = user.orgId || 'org-1';
+
+  // Trigger UPI rule on asset-payment
+  const asset = endpointDb.getBankAssetById('asset-payment');
+  if (asset) {
+    endpointDb.updateBankAsset(asset.id, {
+      security_status: 'COMPROMISED',
+      risk_score: Math.min(100, asset.risk_score + 35)
+    });
+  }
+
+  const eventRecord: BankSecurityEventRecord = {
+    id: `evt-fraud-${crypto.randomBytes(3).toString('hex')}`,
+    org_id: orgId,
+    affected_asset_id: 'asset-payment',
+    event_category: 'UPI Micro-Debit Velocity Burst (RULE-TXN-01)',
+    severity: 'CRITICAL',
+    timestamp: new Date().toISOString(),
+    description: 'Fraud Rule RULE-TXN-01 triggered: 420 micro-debits/min detected on UPI switch node.',
+    detection_source: 'UPI AI Sentry',
+    investigation_status: 'NEW',
+    recommended_action: 'Apply instant velocity throttling and freeze payout destination VPA.'
+  };
+  endpointDb.saveBankSecurityEvent(eventRecord);
+  endpointDb.appendAudit(user.email, orgId, 'FRAUD_RULE_TRIGGERED', 'Simulated RULE-TXN-01 UPI micro-debit velocity burst.');
+
+  return res.json({
+    success: true,
+    ruleId: 'RULE-TXN-01',
+    event: toBankSecurityEvent({ ...eventRecord, affected_asset_name: 'UPI & Payment Gateway Processor' })
+  });
+});
+
+
