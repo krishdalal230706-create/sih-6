@@ -94,10 +94,10 @@ export const strictMutationLimiter = createRateLimiter({
   message: 'Security protection: State modification rate limit exceeded. Please wait a minute.'
 });
 
-/** Auth rate limiter: 25 login attempts per 15 minutes */
+/** Auth rate limiter: 30 login attempts per 5 minutes */
 export const authLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000,
-  max: 25,
-  message: 'Too many authentication attempts. Please try again after 15 minutes.'
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  message: 'Too many authentication attempts. Please try again after 5 minutes.'
 });
 
