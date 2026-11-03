@@ -32,10 +32,10 @@ class LedgerDatabase {
     const dataDir = fs.existsSync(backendDataDir)
       ? backendDataDir
       : fs.existsSync(localDataDir)
-      ? localDataDir
-      : fs.existsSync(path.resolve(process.cwd(), 'backend'))
-      ? backendDataDir
-      : localDataDir;
+        ? localDataDir
+        : fs.existsSync(path.resolve(process.cwd(), 'backend'))
+          ? backendDataDir
+          : localDataDir;
 
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });

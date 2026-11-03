@@ -13,12 +13,18 @@ import {
   Clock,
   Layers,
   Sparkles,
-  Server
+  Server,
+  Sun,
+  Moon,
+  SunMoon,
+  Check
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 export const Settings: React.FC = () => {
   const { activeOrg, addNotification, syncStatus, isSyncingVulns, triggerLiveSync, vulnerabilityStats } = useApp();
+  const { theme, toggleTheme, setTheme } = useTheme();
   const [threshold, setThreshold] = useState(80);
   const [autoSyncInterval, setAutoSyncInterval] = useState('30');
   const [saved, setSaved] = useState(false);
@@ -70,72 +76,183 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: General Configuration Form */}
-        <form onSubmit={handleSave} className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-6 text-xs bg-slate-900/60">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
-              <Sliders className="w-4 h-4 text-cyan-400" />
-              <span>Risk & Defense Controls</span>
-            </h3>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-slate-400 font-mono">Critical Risk Score Threshold</label>
-              <span className="font-mono font-bold text-rose-400 text-sm">{threshold} / 100</span>
+        {/* Left Column: Theme & General Configuration */}
+        <div className="space-y-6">
+          {/* Appearance & Theme Toggle Card */}
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-5 text-xs bg-slate-900/60">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                <SunMoon className="w-4 h-4 text-cyan-400" />
+                <span>Appearance & Theme</span>
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 uppercase font-bold">
+                {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+              </span>
             </div>
-            <input
-              type="range"
-              min="50"
-              max="95"
-              value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
-              className="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-            />
-            <p className="text-[10px] text-slate-500 mt-1 font-mono">
-              Alerts trigger automatically when an asset or organization exceeds this calculated score.
+
+            <p className="text-slate-400 text-xs">
+              Toggle between Institutional Cyber Dark and Clean Daylight mode across all dashboards and reports.
             </p>
+
+            {/* Quick Sliding Toggle Row */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950 border border-slate-800 font-mono">
+              <div className="flex items-center space-x-2.5">
+                {theme === 'dark' ? (
+                  <Moon className="w-4 h-4 text-cyan-400" />
+                ) : (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                )}
+                <div>
+                  <div className="text-slate-200 font-bold text-xs">
+                    {theme === 'dark' ? 'Dark Mode (Institutional SOC)' : 'Light Mode (Clean Daylight)'}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Click the toggle switch to change visual theme
+                  </div>
+                </div>
+              </div>
+
+              {/* Animated Switch Button */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label="Toggle dark and light theme"
+                className={`w-14 h-7 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${
+                  theme === 'light' ? 'bg-cyan-500 justify-end' : 'bg-slate-800 justify-start'
+                }`}
+                title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+              >
+                <div className="bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 flex items-center justify-center">
+                  {theme === 'light' ? (
+                    <Sun className="w-3 h-3 text-amber-500" />
+                  ) : (
+                    <Moon className="w-3 h-3 text-slate-800" />
+                  )}
+                </div>
+              </button>
+            </div>
+
+            {/* Visual Mode Selector Grid */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              {/* Dark Option Card */}
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={`p-3.5 rounded-xl border flex flex-col items-center justify-center space-y-2 transition-all text-center ${
+                  theme === 'dark'
+                    ? 'bg-cyan-950/60 border-cyan-500 text-cyan-300 ring-2 ring-cyan-500/30 shadow-lg shadow-cyan-950/50'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center">
+                  <Moon className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div>
+                  <div className="font-bold text-xs text-slate-100">Dark Mode</div>
+                  <div className="text-[10px] text-slate-400 font-mono">Cyber SOC</div>
+                </div>
+                {theme === 'dark' && (
+                  <span className="text-[10px] font-mono font-bold text-cyan-400 flex items-center space-x-1">
+                    <Check className="w-3 h-3" />
+                    <span>Active</span>
+                  </span>
+                )}
+              </button>
+
+              {/* Light Option Card */}
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={`p-3.5 rounded-xl border flex flex-col items-center justify-center space-y-2 transition-all text-center ${
+                  theme === 'light'
+                    ? 'bg-cyan-950/60 border-cyan-500 text-cyan-300 ring-2 ring-cyan-500/30 shadow-lg shadow-cyan-950/50'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center">
+                  <Sun className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <div className="font-bold text-xs text-slate-100">Light Mode</div>
+                  <div className="text-[10px] text-slate-400 font-mono">Daylight</div>
+                </div>
+                {theme === 'light' && (
+                  <span className="text-[10px] font-mono font-bold text-cyan-400 flex items-center space-x-1">
+                    <Check className="w-3 h-3" />
+                    <span>Active</span>
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-slate-400 font-mono mb-2">Scheduled Ingestion Interval</label>
-            <select
-              value={autoSyncInterval}
-              onChange={(e) => setAutoSyncInterval(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 font-mono focus:border-cyan-500 focus:outline-none"
+          {/* Form: General Risk & Defense Controls */}
+          <form onSubmit={handleSave} className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-6 text-xs bg-slate-900/60">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                <Sliders className="w-4 h-4 text-cyan-400" />
+                <span>Risk & Defense Controls</span>
+              </h3>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-slate-400 font-mono">Critical Risk Score Threshold</label>
+                <span className="font-mono font-bold text-rose-400 text-sm">{threshold} / 100</span>
+              </div>
+              <input
+                type="range"
+                min="50"
+                max="95"
+                value={threshold}
+                onChange={(e) => setThreshold(Number(e.target.value))}
+                className="w-full h-2 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+              />
+              <p className="text-[10px] text-slate-500 mt-1 font-mono">
+                Alerts trigger automatically when an asset or organization exceeds this calculated score.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-slate-400 font-mono mb-2">Scheduled Ingestion Interval</label>
+              <select
+                value={autoSyncInterval}
+                onChange={(e) => setAutoSyncInterval(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 font-mono focus:border-cyan-500 focus:outline-none"
+              >
+                <option value="15">Every 15 Minutes (High-Frequency)</option>
+                <option value="30">Every 30 Minutes (Recommended)</option>
+                <option value="60">Every 60 Minutes (Standard)</option>
+                <option value="360">Every 6 Hours</option>
+              </select>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t border-slate-800/80">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono">
+                <div>
+                  <div className="text-slate-200 font-bold">Automated DLT Block Mining</div>
+                  <div className="text-[10px] text-slate-500">Auto-commit verified threat patterns to local ledger</div>
+                </div>
+                <input type="checkbox" defaultChecked className="toggle accent-cyan-500" />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono">
+                <div>
+                  <div className="text-slate-200 font-bold">Privacy Engine Anonymization</div>
+                  <div className="text-[10px] text-slate-500">Strip PII before generating behavioral signatures</div>
+                </div>
+                <input type="checkbox" defaultChecked className="toggle accent-cyan-500" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-lg glow-cyan transition-all"
             >
-              <option value="15">Every 15 Minutes (High-Frequency)</option>
-              <option value="30">Every 30 Minutes (Recommended)</option>
-              <option value="60">Every 60 Minutes (Standard)</option>
-              <option value="360">Every 6 Hours</option>
-            </select>
-          </div>
-
-          <div className="space-y-3 pt-2 border-t border-slate-800/80">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono">
-              <div>
-                <div className="text-slate-200 font-bold">Automated DLT Block Mining</div>
-                <div className="text-[10px] text-slate-500">Auto-commit verified threat patterns to local ledger</div>
-              </div>
-              <input type="checkbox" defaultChecked className="toggle accent-cyan-500" />
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono">
-              <div>
-                <div className="text-slate-200 font-bold">Privacy Engine Anonymization</div>
-                <div className="text-[10px] text-slate-500">Strip PII before generating behavioral signatures</div>
-              </div>
-              <input type="checkbox" defaultChecked className="toggle accent-cyan-500" />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-lg glow-cyan transition-all"
-          >
-            {saved ? '✓ Settings Saved!' : 'Save System Parameters'}
-          </button>
-        </form>
+              {saved ? '✓ Settings Saved!' : 'Save System Parameters'}
+            </button>
+          </form>
+        </div>
 
         {/* Right Column: Intelligence Synchronization Control Center */}
         <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-cyan-500/30 space-y-6 bg-slate-900/60">

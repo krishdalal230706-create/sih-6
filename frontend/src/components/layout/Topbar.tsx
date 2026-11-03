@@ -17,10 +17,13 @@ import {
   Radio,
   ExternalLink,
   Trash2,
-  Check
+  Check,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { api } from '../../api/client';
 
 interface TopbarProps {
@@ -42,6 +45,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
   } = useApp();
 
   const { currentUser, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -230,6 +234,22 @@ export const Topbar: React.FC<TopbarProps> = ({ onMenuToggle }) => {
             </button>
           </>
         )}
+
+        {/* Quick Dark/Light Mode Toggle */}
+        <button
+          id="quick-theme-toggle-btn"
+          type="button"
+          onClick={toggleTheme}
+          className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-400 hover:text-slate-200 transition-colors"
+          title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+          aria-label="Toggle theme mode"
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-cyan-400" />
+          )}
+        </button>
 
         {/* Interactive Notification Bell */}
         <div className="relative" ref={notifRef}>
