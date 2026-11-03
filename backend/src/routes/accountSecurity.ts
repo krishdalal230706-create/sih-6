@@ -17,7 +17,8 @@ export const accountSecurityRouter = Router();
 const recentActions = new Map<string, number>();
 
 const simulateSchema = z.object({
-  userId: z.string().min(1)
+  userId: z.string().min(1),
+  attackType: z.string().optional()
 });
 
 const fixSchema = z.object({
@@ -46,7 +47,7 @@ accountSecurityRouter.post('/simulate', requireAuth, requireDemoMode, async (req
     });
   }
 
-  const { userId } = parseResult.data;
+  const { userId, attackType } = parseResult.data;
   const user = endpointDb.getUserById(userId);
   if (!user) {
     return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'Target user does not exist.' });
@@ -70,7 +71,7 @@ accountSecurityRouter.post('/simulate', requireAuth, requireDemoMode, async (req
   }
 
   try {
-    const alert = accountDetectionEngine.simulateAccountAttack(userId);
+    const alert = accountDetectionEngine.simulateAccountAttack(userId, attackType);
     res.json({
       success: true,
       isSimulation: true,

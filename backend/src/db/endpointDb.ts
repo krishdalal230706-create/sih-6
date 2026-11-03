@@ -470,6 +470,7 @@ export class EndpointDatabase {
         // Bank A (org-1)
         { id: 'usr-bank-admin', org_id: 'org-1', name: 'Bank A Admin', email: 'admin@banka.com', password_hash: adminPassHash, role: 'admin', status: 'active', mfa_required: 0, privilege_level: 'ADMIN', must_reset: 0, created_at: now },
         { id: 'usr-bank-portal-test', org_id: 'org-1', name: 'Portal Test User', email: 'user_portal_test@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
+        { id: 'usr-bank-attack-target', org_id: 'org-1', name: 'Red Team Target (Sandbox)', email: 'attack_target@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
         { id: 'usr-bank-alice', org_id: 'org-1', name: 'Alice Walker', email: 'alice@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'STANDARD', must_reset: 0, created_at: now },
         { id: 'usr-bank-bob', org_id: 'org-1', name: 'Bob Miller', email: 'bob@banka.com', password_hash: userPassHash, role: 'user', status: 'active', mfa_required: 0, privilege_level: 'ELEVATED', must_reset: 0, created_at: now },
 
@@ -1142,6 +1143,16 @@ export class EndpointDatabase {
       `).run('usr-bank-portal-test', 'org-1', 'Portal Test User', 'user_portal_test@banka.com', userPassHash, 'user', 'active', 0, 'STANDARD', 0, new Date().toISOString());
     }
 
+    // Seed Dedicated Red Team / Attack Target Account if missing
+    const existingAttackUser = this.db.prepare('SELECT id FROM users WHERE email = ?').get('attack_target@banka.com');
+    if (!existingAttackUser) {
+      const userPassHash = bcrypt.hashSync('UserPass123!', 10);
+      this.db.prepare(`
+        INSERT OR REPLACE INTO users (id, org_id, name, email, password_hash, role, status, mfa_required, privilege_level, must_reset, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run('usr-bank-attack-target', 'org-1', 'Red Team Target (Sandbox)', 'attack_target@banka.com', userPassHash, 'user', 'active', 0, 'STANDARD', 0, new Date().toISOString());
+    }
+
     // Seed Baseline Login Attempts if empty
     const loginCount = (this.db.prepare('SELECT COUNT(*) as count FROM login_attempts').get() as { count: number }).count;
     if (loginCount === 0) {
@@ -1600,7 +1611,7 @@ export class EndpointDatabase {
       this.db.prepare("UPDATE users SET password_hash = ? WHERE role = 'admin' AND id LIKE 'usr-%'").run(adminPassHash);
       this.db.prepare("UPDATE users SET password_hash = ? WHERE role = 'user' AND id LIKE 'usr-%'").run(userPassHash);
       this.db.prepare("UPDATE users SET status = 'active', must_reset = 0, mfa_required = 0 WHERE id LIKE 'usr-%'").run();
-      this.db.prepare("UPDATE users SET privilege_level = 'STANDARD' WHERE id IN ('usr-bank-alice', 'usr-bank-portal-test', 'usr-hosp-clara', 'usr-hosp-david', 'usr-univ-emma', 'usr-univ-frank')").run();
+      this.db.prepare("UPDATE users SET privilege_level = 'STANDARD' WHERE id IN ('usr-bank-alice', 'usr-bank-portal-test', 'usr-bank-attack-target', 'usr-hosp-clara', 'usr-hosp-david', 'usr-univ-emma', 'usr-univ-frank')").run();
       this.db.prepare("UPDATE users SET privilege_level = 'ELEVATED' WHERE id = 'usr-bank-bob'").run();
       this.db.prepare("UPDATE users SET privilege_level = 'ADMIN' WHERE role = 'admin'").run();
     } catch {}

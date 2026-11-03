@@ -206,9 +206,72 @@ html.light [class*="border-slate-700"] {
 }
 
 html.light [class*="text-slate-100"],
-html.light [class*="text-slate-200"],
-html.light [class*="text-white"] {
+html.light [class*="text-slate-200"] {
   color: #0F172A !important;
+}
+
+html.light [class*="text-white"]:not(button):not([class*="bg-rose"]):not([class*="bg-blue"]):not([class*="bg-purple"]):not([class*="bg-indigo"]):not([class*="bg-emerald"]) {
+  color: #0F172A !important;
+}
+
+/* Ensure bright/solid action buttons retain high-contrast white text */
+html.light button[class*="bg-rose-600"],
+html.light button[class*="bg-rose-500"],
+html.light button[class*="bg-emerald-600"],
+html.light button[class*="bg-blue-600"],
+html.light button[class*="bg-purple-600"],
+html.light button[class*="bg-indigo-600"],
+html.light span[class*="bg-rose-500"],
+html.light span[class*="bg-rose-600"] {
+  color: #FFFFFF !important;
+}
+
+html.light button[class*="bg-gradient-to-r"][class*="text-slate-950"],
+html.light button[class*="bg-cyan-500"][class*="text-slate-950"] {
+  color: #0F172A !important;
+}
+
+/* Light mode Table Styling */
+html.light table thead {
+  background-color: #F8FAFC !important;
+  color: #475569 !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+}
+
+html.light table tbody tr:hover {
+  background-color: #F8FAFC !important;
+}
+
+/* Light mode Sidebar & Navigation */
+html.light aside {
+  background-color: #FFFFFF !important;
+  border-right-color: #E2E8F0 !important;
+}
+
+html.light aside nav a:not(.active) {
+  color: #475569 !important;
+}
+
+html.light aside nav a:not(.active):hover {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+html.light aside nav a.active {
+  background: linear-gradient(to right, rgba(6, 182, 212, 0.12), rgba(59, 130, 246, 0.04)) !important;
+  color: #0891B2 !important;
+  border-left-color: #0891B2 !important;
+}
+
+/* Light mode Topbar & Modals Backdrop */
+html.light header {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-bottom-color: #E2E8F0 !important;
+}
+
+html.light .fixed.inset-0[class*="bg-slate-950"],
+html.light .fixed.inset-0[class*="bg-black"] {
+  background-color: rgba(15, 23, 42, 0.5) !important;
 }
 
 html.light [class*="text-slate-300"],

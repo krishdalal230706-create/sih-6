@@ -47,6 +47,7 @@ export const AccountSecurity: React.FC = () => {
   // Simulation Modal State
   const [isSimModalOpen, setIsSimModalOpen] = useState(false);
   const [selectedSimUser, setSelectedSimUser] = useState<string>('');
+  const [selectedAttackType, setSelectedAttackType] = useState<string>('ALL');
   const [isSimulating, setIsSimulating] = useState(false);
 
   // Phase 6: Account Attack Demo State
@@ -135,13 +136,20 @@ export const AccountSecurity: React.FC = () => {
     if (!selectedSimUser) return;
     setIsSimulating(true);
     try {
-      const data = await api.post<any>('/api/account-security/simulate', { userId: selectedSimUser });
+      const data = await api.post<any>('/api/account-security/simulate', {
+        userId: selectedSimUser,
+        attackType: selectedAttackType
+      });
       setIsSimulating(false);
       setIsSimModalOpen(false);
 
+      const attackLabel = selectedAttackType === 'ALL'
+        ? 'Multi-Vector Attack'
+        : selectedAttackType.replace(/_/g, ' ');
+
       addNotification(
-        '🚨 Account Attack Simulated',
-        `Simulated multi-stage attack injected on user. Alert created with ${data.alert?.confidence}% confidence.`,
+        `🚨 ${attackLabel} Simulated`,
+        `Simulated attack injected on user. Alert created with ${data.alert?.confidence}% confidence.`,
         'ALERT',
         `/account-security/${selectedSimUser}`
       );
@@ -279,7 +287,8 @@ export const AccountSecurity: React.FC = () => {
             <button
               onClick={() => {
                 if (users.length > 0 && !selectedSimUser) {
-                  setSelectedSimUser(users.find((u) => u.role === 'user')?.id || users[0].id);
+                  const targetUser = users.find((u) => u.email === 'attack_target@banka.com') || users.find((u) => u.role === 'user') || users[0];
+                  setSelectedSimUser(targetUser.id);
                 }
                 setIsSimModalOpen(true);
               }}
@@ -523,6 +532,11 @@ export const AccountSecurity: React.FC = () => {
                           <div>
                             <div className="font-semibold text-slate-100 flex items-center space-x-1.5">
                               <span>{u.name}</span>
+                              {u.email === 'attack_target@banka.com' && (
+                                <span className="text-[9px] bg-rose-950/90 text-rose-300 border border-rose-600/60 px-1.5 py-0.2 rounded font-mono font-bold tracking-wide">
+                                  RED TEAM TARGET
+                                </span>
+                              )}
                               {u.role === 'admin' && (
                                 <span className="text-[9px] bg-purple-950/80 text-purple-300 border border-purple-800/50 px-1.5 py-0.2 rounded font-mono">
                                   ADMIN
@@ -633,6 +647,19 @@ export const AccountSecurity: React.FC = () => {
                               <span>Approve</span>
                             </button>
                           )}
+                          {u.email === 'attack_target@banka.com' && (
+                            <button
+                              onClick={() => {
+                                setSelectedSimUser(u.id);
+                                setIsSimModalOpen(true);
+                              }}
+                              className="px-2 py-1 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-600/60 text-rose-300 text-xs font-semibold flex items-center space-x-1 transition"
+                              title="Simulate Attack On This Red Team Sandbox Account"
+                            >
+                              <Play className="w-3 h-3 fill-current" />
+                              <span>Attack</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleToggleUserRole(u)}
                             className="px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-cyan-300 text-[11px] font-mono transition"
@@ -677,8 +704,7 @@ export const AccountSecurity: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Injects a deterministic multi-vector account intrusion sequence on the chosen user:
-              5 rapid failed logins, cracked authentication from Frankfurt (unrecognized client), privilege elevation attempt, and 4.5 GB bulk data egress.
+              Inject a deterministic account intrusion on the target account to test SOC detection, risk scoring, explainability waterfalls, and instant remote remediation.
             </p>
 
             <div>
@@ -690,10 +716,37 @@ export const AccountSecurity: React.FC = () => {
               >
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
+                    {u.email === 'attack_target@banka.com' ? '🎯 [SANDBOX TARGET] ' : ''}
                     {u.name} ({u.email}) - {u.role.toUpperCase()}
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">Attack Vector / Intrusion Type</label>
+              <select
+                value={selectedAttackType}
+                onChange={(e) => setSelectedAttackType(e.target.value)}
+                className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-rose-500"
+              >
+                <option value="ALL">⚡ All Multi-Vector Intrusion (Combined 6-Vector Kill Chain)</option>
+                <option value="BRUTE_FORCE">🔑 Credential Stuffing Streak (5 Rapid Failed Logins - Rule 1)</option>
+                <option value="CRACKED_CREDENTIALS">🔓 Cracked Credentials / Account Takeover (ATO - Rule 2)</option>
+                <option value="ROGUE_DEVICE">💻 Rogue Hardware / Automation Client (Python Scraper - Rule 3)</option>
+                <option value="IMPOSSIBLE_TRAVEL">🌍 Anomalous Offshore Location / Impossible Velocity (Rule 4)</option>
+                <option value="PRIVILEGE_ESCALATION">🛡️ Unauthorized Administrative Privilege Escalation (Rule 5)</option>
+                <option value="DATA_EXFILTRATION">📦 High-Volume Sensitive Data Exfiltration (4.5 GB - Rule 6)</option>
+              </select>
+              <p className="text-[11px] text-slate-400 mt-1 font-mono">
+                {selectedAttackType === 'ALL' && 'Simulates full kill-chain across all 6 threat rules. Confidence: 95%.'}
+                {selectedAttackType === 'BRUTE_FORCE' && 'Injects 5 rapid failed password attempts in 60s, triggering rate limiting & brute-force alarm.'}
+                {selectedAttackType === 'CRACKED_CREDENTIALS' && 'Simulates successful authentication directly following a failed attempt streak.'}
+                {selectedAttackType === 'ROGUE_DEVICE' && 'Simulates sign-in from untrusted Python-Requests adversary automation fingerprint.'}
+                {selectedAttackType === 'IMPOSSIBLE_TRAVEL' && 'Simulates immediate login origin jump to Frankfurt, Germany.'}
+                {selectedAttackType === 'PRIVILEGE_ESCALATION' && 'Simulates standard user attempting unauthorized elevation to ADMIN.'}
+                {selectedAttackType === 'DATA_EXFILTRATION' && 'Simulates 4.5 GB bulk CIF record egress exceeding 95th percentile baseline.'}
+              </p>
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">

@@ -98,6 +98,7 @@ export const MyAccount: React.FC = () => {
   // Demo Tools Collapsible
   const [isDemoToolsOpen, setIsDemoToolsOpen] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [selfAttackType, setSelfAttackType] = useState<string>('ALL');
   const [simulationMessage, setSimulationMessage] = useState<string | null>(null);
 
   // Unified Date Formatter
@@ -482,10 +483,14 @@ export const MyAccount: React.FC = () => {
     setSimulationMessage(null);
 
     try {
-      await api.post('/api/account-security/simulate', { userId: targetUserId });
+      await api.post('/api/account-security/simulate', {
+        userId: targetUserId,
+        attackType: selfAttackType
+      });
       setIsSimulating(false);
+      const attackLabel = selfAttackType === 'ALL' ? 'Multi-Vector Attack' : selfAttackType.replace(/_/g, ' ');
       setSimulationMessage(
-        '🚨 Simulated threat telemetry injected! Threat alert dispatched to your SOC administrator. When the administrator applies containment, this page will update in real-time.'
+        `🚨 Simulated ${attackLabel} injected! Threat alert dispatched to your SOC administrator. When the administrator applies containment, this page will update in real-time.`
       );
       await fetchAccountDetails();
     } catch (err: any) {
@@ -1043,6 +1048,23 @@ export const MyAccount: React.FC = () => {
               <p className="text-slate-300 leading-relaxed">
                 Test the end-to-end security response story: trigger a simulated attack against your own credentials. The intrusion will be detected immediately by the detection engine, elevating the organization risk score and dispatching a high-priority alert to the SOC Console.
               </p>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Select Attack Vector to Simulate</label>
+                <select
+                  value={selfAttackType}
+                  onChange={(e) => setSelfAttackType(e.target.value)}
+                  className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-rose-500"
+                >
+                  <option value="ALL">⚡ All Multi-Vector Intrusion (Combined 6-Vector Kill Chain)</option>
+                  <option value="BRUTE_FORCE">🔑 Credential Stuffing Streak (5 Rapid Failed Logins - Rule 1)</option>
+                  <option value="CRACKED_CREDENTIALS">🔓 Cracked Credentials / Account Takeover (ATO - Rule 2)</option>
+                  <option value="ROGUE_DEVICE">💻 Rogue Hardware / Automation Client (Python Scraper - Rule 3)</option>
+                  <option value="IMPOSSIBLE_TRAVEL">🌍 Anomalous Offshore Location / Impossible Velocity (Rule 4)</option>
+                  <option value="PRIVILEGE_ESCALATION">🛡️ Unauthorized Administrative Privilege Escalation (Rule 5)</option>
+                  <option value="DATA_EXFILTRATION">📦 High-Volume Sensitive Data Exfiltration (4.5 GB - Rule 6)</option>
+                </select>
+              </div>
 
               {simulationMessage && (
                 <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-600/40 text-rose-200 text-xs">

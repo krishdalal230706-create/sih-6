@@ -297,7 +297,11 @@ class AccountDetectionEngine {
    * SIMULATION-ONLY: Inject an attack sequence on a target user.
    * Produces deterministic alert and waterfall breakdown.
    */
-  public simulateAccountAttack(userId: string): AccountAlert {
+  /**
+   * Deterministic Account Attack Simulation Engine.
+   * Supports specific attack vectors or the full multi-vector combined sequence.
+   */
+  public simulateAccountAttack(userId: string, attackType?: string): AccountAlert {
     const user = endpointDb.getUserById(userId);
     if (!user) {
       throw new Error(`User with ID ${userId} not found.`);
@@ -311,95 +315,171 @@ class AccountDetectionEngine {
     // Clear previous window for clean deterministic simulation
     this.userWindows.set(user.id, []);
 
-    // 1. Inject 5 failed login attempts
-    for (let i = 1; i <= 5; i++) {
-      const attemptId = `att-sim-${user.id}-${i}`;
-      const ts = new Date(now - (60 - i * 5) * 1000).toISOString();
-      const loginAttempt: LoginAttemptRecord = {
-        id: attemptId,
+    const type = (attackType || 'ALL').toUpperCase();
+
+    // 1. Rapid Failed Logins Streak (Rule 1: Credential Stuffing / Brute-Force)
+    if (type === 'BRUTE_FORCE' || type === 'ALL') {
+      for (let i = 1; i <= 5; i++) {
+        const attemptId = `att-sim-${user.id}-${i}`;
+        const ts = new Date(now - (60 - i * 5) * 1000).toISOString();
+        const loginAttempt: LoginAttemptRecord = {
+          id: attemptId,
+          user_id: user.id,
+          email: user.email,
+          org_id: user.org_id,
+          success: 0,
+          ip_address: attackerIp,
+          device_fingerprint: attackerDevice,
+          location: foreignLocation,
+          failure_reason: 'INCORRECT_PASSWORD',
+          timestamp: ts
+        };
+        endpointDb.recordLoginAttempt(loginAttempt);
+        this.userWindows.get(user.id)!.push({
+          eventType: 'FAILED_LOGIN',
+          ipAddress: attackerIp,
+          deviceFingerprint: attackerDevice,
+          location: foreignLocation,
+          details: 'Simulated brute-force attempt',
+          severity: 'HIGH',
+          timestamp: now - (60 - i * 5) * 1000
+        });
+      }
+    }
+
+    // 2. Successful Login After Failure Streak (Rule 2: Cracked Credentials / ATO)
+    if (type === 'CRACKED_CREDENTIALS' || type === 'ALL') {
+      if (type === 'CRACKED_CREDENTIALS') {
+        for (let i = 1; i <= 3; i++) {
+          this.userWindows.get(user.id)!.push({
+            eventType: 'FAILED_LOGIN',
+            ipAddress: attackerIp,
+            deviceFingerprint: attackerDevice,
+            location: foreignLocation,
+            details: 'Preceding failed attempt',
+            severity: 'HIGH',
+            timestamp: now - (30 - i * 5) * 1000
+          });
+        }
+      }
+      const successAttemptId = `att-sim-${user.id}-success`;
+      const successTs = new Date(now - 15000).toISOString();
+      endpointDb.recordLoginAttempt({
+        id: successAttemptId,
         user_id: user.id,
         email: user.email,
         org_id: user.org_id,
-        success: 0,
+        success: 1,
         ip_address: attackerIp,
         device_fingerprint: attackerDevice,
         location: foreignLocation,
-        failure_reason: 'INCORRECT_PASSWORD',
-        timestamp: ts
-      };
-      endpointDb.recordLoginAttempt(loginAttempt);
+        failure_reason: null,
+        timestamp: successTs
+      });
       this.userWindows.get(user.id)!.push({
+        eventType: 'SUCCESSFUL_LOGIN',
+        ipAddress: attackerIp,
+        deviceFingerprint: attackerDevice,
+        location: foreignLocation,
+        details: 'Simulated cracked credential login',
+        severity: 'CRITICAL',
+        timestamp: now - 15000
+      });
+    }
+
+    // 3. Rogue Hardware/Browser Fingerprint (Rule 3)
+    if (type === 'ROGUE_DEVICE' || type === 'ALL') {
+      this.userWindows.get(user.id)!.push({
+        eventType: 'NEW_DEVICE',
+        deviceFingerprint: attackerDevice,
+        details: 'Unrecognized automation client',
+        timestamp: now - 14000
+      });
+    }
+
+    // 4. Anomalous Offshore Geolocation / Impossible Velocity (Rule 4)
+    if (type === 'IMPOSSIBLE_TRAVEL' || type === 'ALL') {
+      this.userWindows.get(user.id)!.push({
+        eventType: 'UNUSUAL_LOCATION',
+        location: foreignLocation,
+        details: 'Offshore IP anomaly',
+        timestamp: now - 13000
+      });
+    }
+
+    // 5. Unauthorized Privilege Escalation Attempt (Rule 5)
+    if (type === 'PRIVILEGE_ESCALATION' || type === 'ALL') {
+      this.userWindows.get(user.id)!.push({
+        eventType: 'PRIVILEGE_ESCALATION',
+        details: 'Attempted sudo / role promotion to ADMIN',
+        severity: 'CRITICAL',
+        timestamp: now - 10000
+      });
+    }
+
+    // Final trigger event
+    let finalEvent: AccountEvent;
+    if (type === 'DATA_EXFILTRATION' || type === 'ALL') {
+      finalEvent = {
+        eventType: 'LARGE_DATA_TRANSFER',
+        details: 'Bulk download of customer financial tables (4.5 GB)',
+        severity: 'CRITICAL',
+        timestamp: now - 5000
+      };
+    } else if (type === 'BRUTE_FORCE') {
+      finalEvent = {
         eventType: 'FAILED_LOGIN',
         ipAddress: attackerIp,
         deviceFingerprint: attackerDevice,
         location: foreignLocation,
-        details: 'Simulated brute-force attempt',
+        details: 'Simulated brute-force streak trigger',
         severity: 'HIGH',
-        timestamp: now - (60 - i * 5) * 1000
-      });
+        timestamp: now
+      };
+    } else if (type === 'CRACKED_CREDENTIALS') {
+      finalEvent = {
+        eventType: 'SUCCESSFUL_LOGIN',
+        ipAddress: attackerIp,
+        deviceFingerprint: attackerDevice,
+        location: foreignLocation,
+        details: 'Simulated credential crack success trigger',
+        severity: 'CRITICAL',
+        timestamp: now
+      };
+    } else if (type === 'ROGUE_DEVICE') {
+      finalEvent = {
+        eventType: 'NEW_DEVICE',
+        deviceFingerprint: attackerDevice,
+        details: 'Unrecognized automation client fingerprint',
+        timestamp: now
+      };
+    } else if (type === 'IMPOSSIBLE_TRAVEL') {
+      finalEvent = {
+        eventType: 'UNUSUAL_LOCATION',
+        location: foreignLocation,
+        details: 'Offshore IP velocity anomaly trigger',
+        timestamp: now
+      };
+    } else if (type === 'PRIVILEGE_ESCALATION') {
+      finalEvent = {
+        eventType: 'PRIVILEGE_ESCALATION',
+        details: 'Attempted administrative privilege escalation',
+        severity: 'CRITICAL',
+        timestamp: now
+      };
+    } else {
+      finalEvent = {
+        eventType: 'LARGE_DATA_TRANSFER',
+        details: 'Bulk data transfer anomaly',
+        severity: 'CRITICAL',
+        timestamp: now
+      };
     }
-
-    // 2. Inject 1 successful login directly after failures
-    const successAttemptId = `att-sim-${user.id}-success`;
-    const successTs = new Date(now - 15000).toISOString();
-    endpointDb.recordLoginAttempt({
-      id: successAttemptId,
-      user_id: user.id,
-      email: user.email,
-      org_id: user.org_id,
-      success: 1,
-      ip_address: attackerIp,
-      device_fingerprint: attackerDevice,
-      location: foreignLocation,
-      failure_reason: null,
-      timestamp: successTs
-    });
-    this.userWindows.get(user.id)!.push({
-      eventType: 'SUCCESSFUL_LOGIN',
-      ipAddress: attackerIp,
-      deviceFingerprint: attackerDevice,
-      location: foreignLocation,
-      details: 'Simulated cracked credential login',
-      severity: 'CRITICAL',
-      timestamp: now - 15000
-    });
-
-    // 3. Inject new device event
-    this.userWindows.get(user.id)!.push({
-      eventType: 'NEW_DEVICE',
-      deviceFingerprint: attackerDevice,
-      details: 'Unrecognized automation client',
-      timestamp: now - 14000
-    });
-
-    // 4. Inject unusual location event
-    this.userWindows.get(user.id)!.push({
-      eventType: 'UNUSUAL_LOCATION',
-      location: foreignLocation,
-      details: 'Offshore IP anomaly',
-      timestamp: now - 13000
-    });
-
-    // 5. Inject privilege escalation event
-    this.userWindows.get(user.id)!.push({
-      eventType: 'PRIVILEGE_ESCALATION',
-      details: 'Attempted sudo / role promotion to ADMIN',
-      severity: 'CRITICAL',
-      timestamp: now - 10000
-    });
-
-    // 6. Inject large data egress event
-    const finalEvent: AccountEvent = {
-      eventType: 'LARGE_DATA_TRANSFER',
-      details: 'Bulk download of customer financial tables (4.5 GB)',
-      severity: 'CRITICAL',
-      timestamp: now - 5000
-    };
 
     // Run evaluation
     const alert = this.recordEventAndEvaluate(user, finalEvent);
     if (!alert) {
-      throw new Error('Simulation failed to trigger alert rules.');
+      throw new Error(`Simulation (${type}) failed to trigger alert rules.`);
     }
 
     return alert;
