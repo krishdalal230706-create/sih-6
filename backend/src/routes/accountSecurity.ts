@@ -199,9 +199,11 @@ accountSecurityRouter.post('/fix', requireAuth, requireAdmin, async (req: Authen
     case 'block_ip_device':
       let resolvedIp = entityValue;
       let resolvedDevice = 'Python-Requests/2.31';
-      if (!resolvedIp) {
+      if (!resolvedIp || resolvedIp === '127.0.0.1' || resolvedIp === '::1' || resolvedIp === 'localhost') {
         const attempts = endpointDb.getRecentLoginAttempts(user.email, 20);
-        const suspiciousAttempt = attempts.find((a: LoginAttemptRecord) => a.success === 0 || (Boolean(a.ip_address) && a.ip_address !== '127.0.0.1'));
+        const suspiciousAttempt = attempts.find((a: LoginAttemptRecord) =>
+          Boolean(a.ip_address) && a.ip_address !== '127.0.0.1' && a.ip_address !== '::1' && a.ip_address !== 'localhost'
+        );
         if (suspiciousAttempt && suspiciousAttempt.ip_address) {
           resolvedIp = suspiciousAttempt.ip_address;
           if (suspiciousAttempt.device_fingerprint) {
@@ -209,7 +211,9 @@ accountSecurityRouter.post('/fix', requireAuth, requireAdmin, async (req: Authen
           }
         }
       }
-      const targetIp = resolvedIp || '198.51.100.42';
+      const targetIp = (resolvedIp && resolvedIp !== '127.0.0.1' && resolvedIp !== '::1' && resolvedIp !== 'localhost')
+        ? resolvedIp
+        : '198.51.100.42';
       const targetDevice = resolvedDevice;
       endpointDb.blockEntity(
         user.org_id,

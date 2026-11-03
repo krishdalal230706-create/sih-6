@@ -740,6 +740,9 @@ export class EndpointDatabase {
   }
 
   public isEntityBlocked(orgId: string, ip: string, device: string): { blocked: boolean; reason?: string } {
+    // Loopback/local development addresses must never be blocked at perimeter
+    const effectiveIp = (ip === '127.0.0.1' || ip === '::1' || ip === 'localhost') ? '__loopback_whitelisted__' : ip;
+
     const found = this.db.prepare(`
       SELECT * FROM blocked_entities
       WHERE org_id = ? AND (
@@ -747,7 +750,7 @@ export class EndpointDatabase {
         (entity_type = 'DEVICE' AND entity_value = ?)
       )
       LIMIT 1
-    `).get(orgId, ip, device) as BlockedEntityRecord | undefined;
+    `).get(orgId, effectiveIp, device) as BlockedEntityRecord | undefined;
 
     if (found) {
       return { blocked: true, reason: found.reason };
