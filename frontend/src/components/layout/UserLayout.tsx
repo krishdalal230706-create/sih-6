@@ -58,6 +58,11 @@ export const UserLayout: React.FC = () => {
               <span className="text-[10px] bg-cyan-950/60 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-mono">
                 User Portal
               </span>
+              {currentUser.email === 'attack_target@banka.com' && (
+                <span className="text-[10px] bg-rose-950 text-rose-300 border border-rose-500/70 px-2 py-0.5 rounded-full font-mono font-bold tracking-wide animate-pulse">
+                  RED TEAM ADVERSARY
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-1.5 text-[11px] text-slate-400">
               <Building2 className="w-3 h-3 text-slate-500" />

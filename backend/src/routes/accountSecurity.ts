@@ -40,7 +40,10 @@ const fixSchema = z.object({
 // GET /api/account-security/targets
 // List eligible attack target accounts in caller's organization (Admin or attack_target@banka.com)
 accountSecurityRouter.get('/targets', requireAuth, requireDemoMode, (req: AuthenticatedRequest, res: Response) => {
-  const isAttackAccount = req.user!.email === 'attack_target@banka.com';
+  const isAttackAccount =
+    (req.user?.email && req.user.email.toLowerCase() === 'attack_target@banka.com') ||
+    req.user?.userId === 'usr-bank-attack-target';
+
   if (req.user!.role !== 'admin' && !isAttackAccount) {
     return res.status(403).json({ error: 'FORBIDDEN', message: 'Target inspection reserved for SOC administrators and Red Team sandbox accounts.' });
   }
@@ -70,12 +73,17 @@ accountSecurityRouter.post('/simulate', requireAuth, requireDemoMode, async (req
   }
 
   const { userId, attackType } = parseResult.data;
-  const user = endpointDb.getUserById(userId);
+  let user = endpointDb.getUserById(userId);
   if (!user) {
-    return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'Target user does not exist.' });
+    user = endpointDb.getUserByEmail(userId);
+  }
+  if (!user) {
+    return res.status(404).json({ error: 'USER_NOT_FOUND', message: `Target user '${userId}' does not exist.` });
   }
 
-  const isAttackAccount = req.user!.email === 'attack_target@banka.com';
+  const isAttackAccount =
+    (req.user?.email && req.user.email.toLowerCase() === 'attack_target@banka.com') ||
+    req.user?.userId === 'usr-bank-attack-target';
 
   // Permissions check:
   // - Admin can simulate on any user in their own org
@@ -96,7 +104,7 @@ accountSecurityRouter.post('/simulate', requireAuth, requireDemoMode, async (req
   }
 
   try {
-    const alert = accountDetectionEngine.simulateAccountAttack(userId, attackType);
+    const alert = accountDetectionEngine.simulateAccountAttack(user.id, attackType);
     if (isAttackAccount) {
       endpointDb.appendAudit(
         req.user!.email,

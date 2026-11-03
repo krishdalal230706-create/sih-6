@@ -479,7 +479,8 @@ export const MyAccount: React.FC = () => {
     }
   };
 
-  const isAttackAccount = currentUser?.email === 'attack_target@banka.com';
+  const currentEmail = (currentUser?.email || accountData?.user?.email || '').toLowerCase().trim();
+  const isAttackAccount = currentEmail === 'attack_target@banka.com' || currentUser?.id === 'usr-bank-attack-target' || accountData?.user?.id === 'usr-bank-attack-target';
 
   const fetchTargets = useCallback(async () => {
     if (!isAttackAccount) return;
