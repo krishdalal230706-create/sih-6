@@ -37,7 +37,29 @@ const fixSchema = z.object({
   reason: z.string().optional()
 });
 
-// SIMULATION-ONLY: Simulate account attack sequence on chosen user (Admin or user testing own account, DEMO_MODE only)
+// GET /api/account-security/targets
+// List eligible attack target accounts in caller's organization (Admin or attack_target@banka.com)
+accountSecurityRouter.get('/targets', requireAuth, requireDemoMode, (req: AuthenticatedRequest, res: Response) => {
+  const isAttackAccount = req.user!.email === 'attack_target@banka.com';
+  if (req.user!.role !== 'admin' && !isAttackAccount) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Target inspection reserved for SOC administrators and Red Team sandbox accounts.' });
+  }
+
+  const orgId = req.user!.orgId;
+  const users = endpointDb.getUsersByOrg(orgId).map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    privilegeLevel: u.privilege_level || 'STANDARD',
+    isUnderAttack: Boolean(endpointDb.getAccountAlertByUserId(u.id))
+  }));
+
+  res.json({ targets: users });
+});
+
+// SIMULATION-ONLY: Simulate account attack sequence on chosen user (Admin or attack_target account, DEMO_MODE only)
 accountSecurityRouter.post('/simulate', requireAuth, requireDemoMode, async (req: AuthenticatedRequest, res: Response) => {
   const parseResult = simulateSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -53,17 +75,20 @@ accountSecurityRouter.post('/simulate', requireAuth, requireDemoMode, async (req
     return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'Target user does not exist.' });
   }
 
+  const isAttackAccount = req.user!.email === 'attack_target@banka.com';
+
   // Permissions check:
   // - Admin can simulate on any user in their own org
-  // - Standard user can test attack simulation on their own account
-  if (req.user!.role !== 'admin' && user.id !== req.user!.userId) {
+  // - attack_target@banka.com (Red Team Sandbox Account) can simulate on ANY user in their own org
+  // - Other standard users can only test attack simulation on their own account
+  if (req.user!.role !== 'admin' && !isAttackAccount && user.id !== req.user!.userId) {
     return res.status(403).json({
       error: 'FORBIDDEN',
       message: 'Standard users can only test attack simulation on their own account.'
     });
   }
 
-  if (req.user!.role === 'admin' && user.org_id !== req.user!.orgId) {
+  if ((req.user!.role === 'admin' || isAttackAccount) && user.org_id !== req.user!.orgId) {
     return res.status(403).json({
       error: 'FORBIDDEN',
       message: 'Cannot simulate attacks on users of another organization.'
@@ -72,10 +97,18 @@ accountSecurityRouter.post('/simulate', requireAuth, requireDemoMode, async (req
 
   try {
     const alert = accountDetectionEngine.simulateAccountAttack(userId, attackType);
+    if (isAttackAccount) {
+      endpointDb.appendAudit(
+        req.user!.email,
+        user.org_id,
+        'RED_TEAM_ATTACK_LAUNCHED',
+        `Red Team Adversary account (${req.user!.email}) executed simulated ${attackType || 'ALL'} intrusion targeting ${user.name} (${user.email}). Alert dispatched to SOC.`
+      );
+    }
     res.json({
       success: true,
       isSimulation: true,
-      message: `Simulated attack executed against ${user.email}. Alert generated and org risk elevated. Admin notified.`,
+      message: `Simulated attack executed against ${user.name} (${user.email}). Alert generated and org risk elevated. Admin notified.`,
       alert
     });
   } catch (err: any) {

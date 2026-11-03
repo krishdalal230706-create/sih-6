@@ -24,7 +24,10 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  Laptop
+  Laptop,
+  Crosshair,
+  Zap,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
@@ -95,11 +98,13 @@ export const MyAccount: React.FC = () => {
   const [isRevokingSessions, setIsRevokingSessions] = useState(false);
   const [sessionSuccessMsg, setSessionSuccessMsg] = useState<string | null>(null);
 
-  // Demo Tools Collapsible
+  // Demo Tools & Red Team Suite
   const [isDemoToolsOpen, setIsDemoToolsOpen] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [selfAttackType, setSelfAttackType] = useState<string>('ALL');
   const [simulationMessage, setSimulationMessage] = useState<string | null>(null);
+  const [targets, setTargets] = useState<any[]>([]);
+  const [selectedTargetUserId, setSelectedTargetUserId] = useState<string>('');
 
   // Unified Date Formatter
   const formatDate = (isoString?: string): string => {
@@ -474,25 +479,51 @@ export const MyAccount: React.FC = () => {
     }
   };
 
-  // Simulate Self Attack (Demo tools only)
-  const handleSimulateSelfAttack = async () => {
-    const targetUserId = accountData?.user?.id || currentUser?.id;
-    if (!targetUserId) return;
+  const isAttackAccount = currentUser?.email === 'attack_target@banka.com';
+
+  const fetchTargets = useCallback(async () => {
+    if (!isAttackAccount) return;
+    try {
+      const res = await api.get<{ targets: any[] }>('/api/account-security/targets');
+      if (res && res.targets) {
+        setTargets(res.targets);
+        setSelectedTargetUserId((prev) => {
+          if (prev) return prev;
+          const defaultVictim = res.targets.find((t: any) => t.email !== 'attack_target@banka.com') || res.targets[0];
+          return defaultVictim ? defaultVictim.id : '';
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load targets:', err);
+    }
+  }, [isAttackAccount]);
+
+  useEffect(() => {
+    fetchTargets();
+  }, [fetchTargets]);
+
+  // Launch attack on selected victim (Red Team suite) or self
+  const handleLaunchAdversaryAttack = async () => {
+    const targetId = isAttackAccount && selectedTargetUserId ? selectedTargetUserId : (accountData?.user?.id || currentUser?.id);
+    if (!targetId) return;
 
     setIsSimulating(true);
     setSimulationMessage(null);
 
     try {
-      await api.post('/api/account-security/simulate', {
-        userId: targetUserId,
+      const res = await api.post<any>('/api/account-security/simulate', {
+        userId: targetId,
         attackType: selfAttackType
       });
       setIsSimulating(false);
+      const targetUser = targets.find((t) => t.id === targetId);
+      const targetName = targetUser ? `${targetUser.name} (${targetUser.email})` : 'Target Account';
       const attackLabel = selfAttackType === 'ALL' ? 'Multi-Vector Attack' : selfAttackType.replace(/_/g, ' ');
       setSimulationMessage(
-        `🚨 Simulated ${attackLabel} injected! Threat alert dispatched to your SOC administrator. When the administrator applies containment, this page will update in real-time.`
+        `🚨 ${attackLabel} successfully executed against ${targetName}! An alert with ${res.alert?.confidence}% confidence has been emitted. Admin SOC console now displays this user UNDER ATTACK and can apply Remote Fixes.`
       );
       await fetchAccountDetails();
+      await fetchTargets();
     } catch (err: any) {
       setIsSimulating(false);
       setSimulationMessage(err.message || 'Failed to trigger attack simulation.');
@@ -591,6 +622,95 @@ export const MyAccount: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Red Team Adversary Attack Suite (Authorized for attack_target@banka.com) */}
+      {isAttackAccount && (
+        <div className="bg-gradient-to-r from-rose-950/40 via-[#0F1420] to-purple-950/30 border border-rose-500/50 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-900/40 pb-3">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                <Crosshair className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-base font-bold text-white uppercase tracking-wider">Red Team Adversary Console</h2>
+                  <span className="text-[10px] bg-rose-950 text-rose-300 border border-rose-600/60 px-2 py-0.5 rounded font-mono font-bold">
+                    AUTHORIZED ATTACKER
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Simulate any account intrusion against any user in your organization. All attacks will be detected by the Admin SOC Console for containment.
+                </p>
+              </div>
+            </div>
+            <div className="text-[11px] font-mono text-rose-400/90 bg-rose-950/60 border border-rose-800/50 px-2.5 py-1 rounded-lg shrink-0">
+              Target Pool: {targets.length} Account(s)
+            </div>
+          </div>
+
+          {simulationMessage && (
+            <div className="p-3.5 rounded-xl bg-rose-950/50 border border-rose-500/60 text-rose-200 text-xs flex items-start space-x-2 animate-fadeIn">
+              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{simulationMessage}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-200 mb-1.5 flex items-center space-x-1.5">
+                <Users className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Select Target Victim Account</span>
+              </label>
+              <select
+                value={selectedTargetUserId}
+                onChange={(e) => setSelectedTargetUserId(e.target.value)}
+                className="w-full bg-[#0B0F17] border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-rose-500"
+              >
+                {targets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.email}) - {t.role.toUpperCase()} {t.isUnderAttack ? '⚠️ [UNDER ATTACK]' : '✅ [HEALTHY]'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-200 mb-1.5 flex items-center space-x-1.5">
+                <Zap className="w-3.5 h-3.5 text-rose-400" />
+                <span>Select Attack Vector</span>
+              </label>
+              <select
+                value={selfAttackType}
+                onChange={(e) => setSelfAttackType(e.target.value)}
+                className="w-full bg-[#0B0F17] border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-rose-500"
+              >
+                <option value="ALL">⚡ All Multi-Vector Intrusion (Combined 6-Vector Kill Chain)</option>
+                <option value="BRUTE_FORCE">🔑 Credential Stuffing Streak (5 Rapid Failed Logins - Rule 1)</option>
+                <option value="CRACKED_CREDENTIALS">🔓 Cracked Credentials / Account Takeover (ATO - Rule 2)</option>
+                <option value="ROGUE_DEVICE">💻 Rogue Hardware / Python Botnet Scraper (Rule 3)</option>
+                <option value="IMPOSSIBLE_TRAVEL">🌍 Anomalous Offshore Location / Impossible Velocity (Rule 4)</option>
+                <option value="PRIVILEGE_ESCALATION">🛡️ Unauthorized Administrative Privilege Escalation (Rule 5)</option>
+                <option value="DATA_EXFILTRATION">📦 High-Volume Sensitive Data Exfiltration (4.5 GB - Rule 6)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <span className="text-[11px] text-slate-400 font-mono">
+              Intrusion will trigger the 60s sliding telemetry window and notify the Admin SOC Console in real-time.
+            </span>
+            <button
+              type="button"
+              disabled={isSimulating || !selectedTargetUserId}
+              onClick={handleLaunchAdversaryAttack}
+              className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-900/40 flex items-center justify-center space-x-2 transition-all cursor-pointer"
+            >
+              <Crosshair className={`w-4 h-4 ${isSimulating ? 'animate-spin' : ''}`} />
+              <span>{isSimulating ? 'Executing Attack Sequence...' : 'Launch Attack On Target User'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Critical Status Alerts */}
       {isLocked && (
@@ -1073,12 +1193,12 @@ export const MyAccount: React.FC = () => {
               )}
 
               <button
-                onClick={handleSimulateSelfAttack}
+                onClick={handleLaunchAdversaryAttack}
                 disabled={isSimulating}
                 className="px-4 py-2 bg-rose-950 hover:bg-rose-900 border border-rose-600/60 text-rose-300 rounded-xl text-xs font-semibold transition flex items-center space-x-2"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
-                <span>{isSimulating ? 'Injecting Attack...' : 'Simulate Attack on My Account'}</span>
+                <span>{isSimulating ? 'Injecting Attack...' : isAttackAccount ? 'Execute Attack via Red Team Suite' : 'Simulate Attack on My Account'}</span>
               </button>
             </div>
           )}
